@@ -1,5 +1,5 @@
-import React, { useEffect } from "react";
-import useTopStocksAboveSMA from "./FinnhubScreener";
+import { useEffect, useState } from "react";
+import screenSector from "./SectorScreener";
 
 const sectors = [
   { symbol: "AMEX:XLK", name: "Technology (XLK)" },
@@ -15,16 +15,53 @@ const sectors = [
   { symbol: "AMEX:XLC", name: "Communication (XLC)" },
 ];
 
-const topStocks = [
-  { symbol: "NASDAQ:AAPL", name: "Apple" },
-  { symbol: "NASDAQ:MSFT", name: "Microsoft" },
-  { symbol: "NASDAQ:GOOGL", name: "Alphabet" },
-  { symbol: "NASDAQ:NVDA", name: "NVIDIA" },
-  { symbol: "NASDAQ:AMZN", name: "Amazon" },
-];
-
 const SectorChartsDashboard = () => {
-  const { topStocks, loading, error } = useTopStocksAboveSMA("XLK"); // pass sector symbol
+  const [topStocks, setTopStocks] = useState([]);
+
+  // Step 1: Fetch stock data and update state
+  useEffect(() => {
+    const fetchTopStocks = async () => {
+      try {
+        let result = await screenSector("XLK");
+        setTopStocks(result.slice(0, 5) || []);
+      } catch (error) {
+        console.error("Error loading top stocks:", error);
+      }
+    };
+
+    fetchTopStocks();
+  }, []);
+
+  // Step 2: When topStocks state updates, initialize widgets
+  useEffect(() => {
+    if (!topStocks.length || !window.TradingView) return;
+
+    topStocks.forEach((stock, index) => {
+      const containerId = `top_stock_chart_${index}`;
+      const container = document.getElementById(containerId);
+      if (!container) return; // Wait for DOM to render
+
+      new window.TradingView.widget({
+        container_id: containerId,
+        autosize: true,
+        symbol: stock.ticker,
+        interval: "D",
+        timezone: "Etc/UTC",
+        theme: "light",
+        style: "1",
+        toolbar_bg: "#f1f3f6",
+        hide_top_toolbar: false,
+        hide_side_toolbar: false,
+        allow_symbol_change: false,
+        studies: [
+          { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
+        ],
+        withdateranges: true,
+        details: false,
+        hideideas: true
+      });
+    });
+  }, [topStocks]);
 
   useEffect(() => {
     const loadWidgets = () => {
@@ -44,28 +81,6 @@ const SectorChartsDashboard = () => {
           studies: [
             { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
             { id: "MASimple@tv-basicstudies", inputs: { length: 150 } },
-          ],
-          withdateranges: true,
-          details: false,
-          hideideas: true,
-        });
-      });
-
-      topStocks.forEach(({ symbol }, index) => {
-        new window.TradingView.widget({
-          container_id: `top_stock_chart_${index}`,
-          autosize: true,
-          symbol,
-          interval: "D",
-          timezone: "Etc/UTC",
-          theme: "light",
-          style: "1",
-          toolbar_bg: "#f1f3f6",
-          hide_top_toolbar: false,
-          hide_side_toolbar: false,
-          allow_symbol_change: false,
-          studies: [
-            { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
           ],
           withdateranges: true,
           details: false,
