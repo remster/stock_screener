@@ -3,6 +3,32 @@ import { useEffect, useState, useMemo } from "react";
 const FINNHUB_API_KEY = "d0kt3b9r01qn937mtoa0d0kt3b9r01qn937mtoag";
 const FINNHUB_BASE_URL = "https://finnhub.io/api/v1";
 
+const fetchHoldings = async (etfSymbol) => {
+    try {
+        const response = await fetch(`http://localhost:3001/holdings/${etfSymbol}`);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch holdings: ${response.status} ${response.statusText}`);
+        }
+        const json = await response.json();
+        const dataRows = json.slice(3);
+
+        const holdings = dataRows.map(row => ({
+            name: row["Fund Name:"],
+            ticker: row["The Technology Select Sector SPDR® Fund"],
+            cusip: row["__EMPTY"],
+            sedol: row["__EMPTY_1"],
+            weight: parseFloat(row["__EMPTY_2"]),
+            sector: row["__EMPTY_3"],
+            sharesHeld: parseInt(row["__EMPTY_4"], 10),
+            currency: row["__EMPTY_5"]
+        }));
+        return holdings;
+    } catch (error) {
+        console.error("Error fetching holdings:", error);
+        throw error;
+    }
+}
+
 const fetchWithCache = async (url, cache) => {
   if (cache[url]) return cache[url];
   const response = await fetch(url);
@@ -24,56 +50,47 @@ const useTopStocksAboveSMA = (sectorSymbol = "XLK") => {
       try {
         setLoading(true);
         // Step 1: Get holdings of the sector ETF
-        const holdingsUrl = `${FINNHUB_BASE_URL}/etf/holdings?symbol=${sectorSymbol}&token=${FINNHUB_API_KEY}`;
-        const holdingsData = await fetchWithCache(holdingsUrl, cache);
+        const holdings = await fetchHoldings(sectorSymbol);
 
         // Limit to first 50 holdings to avoid overload
-        const symbols = holdingsData.holdings
-          .map((h) => h.symbol)
-          .slice(0, 50);
+        const tickers = holdings
+          .map((h) => h.ticker)
+          .slice(0, 1);
 
-        // Step 2: For each symbol fetch quote, profile, SMA
-        const stockData = await Promise.all(
-          symbols.map(async (symbol) => {
+        // Step 2: For each ticker fetch quote, profile, SMA
+        const stockData = tickers.map(async (ticker) => {
             const quote = await fetchWithCache(
-              `${FINNHUB_BASE_URL}/quote?symbol=${symbol}&token=${FINNHUB_API_KEY}`,
-              cache
+                `${FINNHUB_BASE_URL}/quote?symbol=${ticker}&token=${FINNHUB_API_KEY}`,
+                cache
             );
             const profile = await fetchWithCache(
-              `${FINNHUB_BASE_URL}/stock/profile2?symbol=${symbol}&token=${FINNHUB_API_KEY}`,
-              cache
+                `${FINNHUB_BASE_URL}/stock/profile2?symbol=${ticker}&token=${FINNHUB_API_KEY}`,
+                cache
             );
+            let history = await fetch(`http://localhost:3001/history/MSFT`);
+            history = await history.json();
             // Calculate timestamps for SMA query (~ last 100 days)
             const to = Math.floor(Date.now() / 1000);
             const from = to - 86400 * 100;
 
-            // Finnhub SMA endpoint example:
-            // (Note: Finnhub indicator endpoint requires paid plan; if not available fallback or remove)
-            // So let's fetch daily candles & calculate SMA ourselves as a fallback
-            const candles = await fetchWithCache(
-              `${FINNHUB_BASE_URL}/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${FINNHUB_API_KEY}`,
-              cache
-            );
-
             let sma50 = null;
-            if (candles && candles.c && candles.c.length >= 50) {
-              // Simple 50-day SMA calc (last 50 closes average)
-              const closes = candles.c.slice(-50);
-              sma50 = closes.reduce((a, b) => a + b, 0) / closes.length;
-            }
+            /*if (candles && candles.c && candles.c.length >= 50) {
+                // Simple 50-day SMA calc (last 50 closes average)
+                const closes = candles.c.slice(-50);
+                sma50 = closes.reduce((a, b) => a + b, 0) / closes.length;
+            }*/
 
             const price = quote.c;
 
             return {
-              symbol,
-              name: profile.name || symbol,
-              marketCap: profile.marketCapitalization || 0,
-              price,
-              sma50,
-              isAboveSMA: price > sma50,
+                ticker,
+                name: profile.name || ticker,
+                marketCap: profile.marketCapitalization || 0,
+                price,
+                sma50,
+                isAboveSMA: price > sma50,
             };
-          })
-        );
+        });
 
         // Step 3: Filter, sort, slice top 5
         const filtered = stockData

@@ -3,8 +3,20 @@ import fs from 'fs';
 import path from 'path';
 import fetch from 'node-fetch';
 import XLSX from 'xlsx';
+import cors from 'cors';
+import yahooFinance from 'yahoo-finance2';
+
+async function getHistoricalPrices(symbol) {
+  const result = await yahooFinance.historical(symbol, {
+    period1: '2024-01-01', // adjust dynamically as needed
+    interval: '1d',
+  });
+
+  return result; // array of daily bars with date, open, close, etc.
+}
 
 const app = express();
+app.use(cors());
 const PORT = process.env.PORT || 3001;
 const CACHE_DIR = path.resolve('./.cache');
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in ms
@@ -64,6 +76,17 @@ app.get('/holdings/:ticker', async (req, res) => {
   }
 });
 
+app.get('/history/:symbol', async (req, res) => {
+    try {
+      const { symbol } = req.params;
+      const prices = await getHistoricalPrices(symbol);
+      res.json(prices);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to fetch historical prices', details: err.message });
+    }
+  });
+
 app.listen(PORT, () => {
   console.log(`ETF holdings proxy server running on http://localhost:${PORT}`);
 });
+
