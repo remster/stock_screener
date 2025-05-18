@@ -5,7 +5,7 @@ import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 const CACHE_DIR = path.resolve('./.cache');
 const CACHE_DURATION = 7 * 24 * 60 * 60 * 1000; // 1 week in ms
 

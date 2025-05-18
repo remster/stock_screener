@@ -1,0 +1,18 @@
+{
+    "type": "module",
+    "name": "holdings-per-eft",
+    "version": "0.1.0",
+    "private": true,
+    "dependencies": {
+      "express": "^5.1.0",
+      "node-fetch": "^3.3.2",
+      "react": "^19.1.0",
+      "react-dom": "^19.1.0",
+      "react-scripts": "5.0.1",
+      "web-vitals": "^2.1.4",
+      "xlsx": "^0.18.5"
+    },
+    "scripts": {
+      "start": "node ./proxy.js"
+    }
+  }
