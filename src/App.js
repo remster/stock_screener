@@ -2,17 +2,17 @@ import { useEffect, useState } from "react";
 import screenSector from "./SectorScreener";
 
 const sectors = [
-  { symbol: "AMEX:XLK", name: "Technology (XLK)" },
-  { symbol: "AMEX:XLF", name: "Financials (XLF)" },
-  { symbol: "AMEX:XLV", name: "Health Care (XLV)" },
-  { symbol: "AMEX:XLE", name: "Energy (XLE)" },
-  { symbol: "AMEX:XLI", name: "Industrials (XLI)" },
-  { symbol: "AMEX:XLY", name: "Consumer Discretionary (XLY)" },
-  { symbol: "AMEX:XLP", name: "Consumer Staples (XLP)" },
-  { symbol: "AMEX:XLU", name: "Utilities (XLU)" },
-  { symbol: "AMEX:XLB", name: "Materials (XLB)" },
-  { symbol: "AMEX:XLRE", name: "Real Estate (XLRE)" },
-  { symbol: "AMEX:XLC", name: "Communication (XLC)" },
+  { symbol: "XLK", name: "Technology (XLK)" },
+  { symbol: "XLF", name: "Financials (XLF)" },
+  { symbol: "XLV", name: "Health Care (XLV)" },
+  { symbol: "XLE", name: "Energy (XLE)" },
+  { symbol: "XLI", name: "Industrials (XLI)" },
+  { symbol: "XLY", name: "Consumer Discretionary (XLY)" },
+  { symbol: "XLP", name: "Consumer Staples (XLP)" },
+  { symbol: "XLU", name: "Utilities (XLU)" },
+  { symbol: "XLB", name: "Materials (XLB)" },
+  { symbol: "XLRE", name: "Real Estate (XLRE)" },
+  { symbol: "XLC", name: "Communication (XLC)" },
 ];
 
 const SectorChartsDashboard = () => {
@@ -55,6 +55,7 @@ const SectorChartsDashboard = () => {
         allow_symbol_change: false,
         studies: [
           { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
+          { id: "MASimple@tv-basicstudies", inputs: { length: 150 } },
         ],
         withdateranges: true,
         details: false,
@@ -69,7 +70,7 @@ const SectorChartsDashboard = () => {
         new window.TradingView.widget({
           container_id: `tv_chart_${index}`,
           autosize: true,
-          symbol,
+          symbol: "AMEX:"+symbol,
           interval: "D",
           timezone: "Etc/UTC",
           theme: "light",
