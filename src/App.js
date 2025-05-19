@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import screenSector from "./SectorScreener";
 
 const sectors = [
@@ -17,9 +17,12 @@ const sectors = [
 
 const SectorChartsDashboard = () => {
   const [sectorTopStocks, setSectorTopStocks] = useState({});
+  const hasFetched = useRef(false);
 
   useEffect(() => {
     const fetchAllSectors = async () => {
+      if (hasFetched.current) return;
+      hasFetched.current = true;
       const data = {};
       for (const { symbol } of sectors) {
         try {
@@ -99,7 +102,7 @@ const SectorChartsDashboard = () => {
       script.src = "https://s3.tradingview.com/tv.js";
       script.async = true;
       script.onload = () => {
-        console.log("TradingView loaded.");
+        //console.log("TradingView loaded.");
       };
       document.body.appendChild(script);
     }
