@@ -8,10 +8,17 @@ const fetchHoldings = async (etfSymbol) => {
         }
         const json = await response.json();
         const dataRows = json.slice(3);
+        let tickerKey = undefined;
+        for (let key in dataRows[0]) {
+            if (key.includes("Select Sector SPDR®")) {
+                tickerKey = key;
+                break;
+            }
+        }
 
         const holdings = dataRows.map(row => ({
             name: row["Fund Name:"],
-            ticker: row["The Technology Select Sector SPDR® Fund"],
+            ticker: row[tickerKey],
             cusip: row["__EMPTY"],
             sedol: row["__EMPTY_1"],
             weight: parseFloat(row["__EMPTY_2"]),
