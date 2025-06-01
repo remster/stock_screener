@@ -15,6 +15,7 @@
         "yahoo-finance2": "^2.13.3"
     },
     "scripts": {
-        "start": "node ./proxy.js"
+        "start": "node ./proxy.js",
+        "debug": "node --inspect ./proxy.js"
     }
 }

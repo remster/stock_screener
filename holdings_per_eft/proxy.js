@@ -42,6 +42,7 @@ async function fetchAndParseHoldings(ticker) {
     }
   }
 
+  console.log("fetching "+url)
   await downloadFile(url, filePath);
 
   // Parse XLSX
@@ -67,22 +68,106 @@ app.get('/holdings/:ticker', async (req, res) => {
   }
 });
 
+const formatDate = (date) => date.toISOString().slice(0, 10);
+
+const getLastSixMonthsDates = () => {
+  const now = new Date();
+  const past = new Date();
+  past.setMonth(now.getMonth() - 6);
+
+  const dates = [];
+  for (let d = new Date(past); d <= now; d.setDate(d.getDate() + 1)) {
+    dates.push(formatDate(new Date(d)));
+  }
+  return dates;
+};
+
+const ensureCacheDir = async () => {
+  if (!fs.existsSync(CACHE_DIR)) {
+    await fs.mkdir(CACHE_DIR, { recursive: true });
+  }
+};
+
 app.get('/history/:symbol', async (req, res) => {
-    try {
-      const { symbol } = req.params;
-      const prices = await yahooFinance.historical(symbol, {
-        period1: '2024-01-01', // adjust dynamically as needed
+  try {
+    const { symbol } = req.params;
+    await ensureCacheDir();
+    const allDates = getLastSixMonthsDates();
+    const candles = [];
+
+    const missingDates = [];
+
+    const cache_dir = path.join(CACHE_DIR, `${symbol}`)
+    if (!fs.existsSync(cache_dir)) {
+      fs.mkdirSync(cache_dir);
+    }
+    for (const date of allDates) {
+      const cacheFile = path.join(cache_dir, `${date}.json`);
+      if (fs.existsSync(cacheFile)) {
+        const cached = fs.readFileSync(cacheFile, 'utf-8');
+        if (cached.length) {
+          candles.push(JSON.parse(cached));
+        }
+      } else {
+        missingDates.push(date);
+      }
+    }
+
+    if (missingDates.length > 0) {
+      const from = new Date(missingDates[0]);
+      const to = new Date();
+      console.log(`Fetching missing range for ${symbol}: ${formatDate(from)} to ${formatDate(to)}`);
+
+      const result = await yahooFinance.historical(symbol, {
+        period1: from,
+        period2: to,
         interval: '1d',
       });
-      const summary = await yahooFinance.quoteSummary(symbol, { modules: ['summaryDetail'] });
-      res.json({
-        summary: summary.summaryDetail,
-        candles: prices
-      });
-    } catch (err) {
-      res.status(500).json({ error: 'Failed to fetch historical prices', details: err.message });
+
+      for (const candle of result) {
+        const date = formatDate(new Date(candle.date)); // force to YYYY-MM-DD
+        const cacheFile = path.join(cache_dir, `${date}.json`);
+
+        // Cache if not already written
+        if (!fs.existsSync(cacheFile)) {
+          fs.writeFileSync(cacheFile, JSON.stringify(candle, null, 2), 'utf-8');
+        }
+
+        // Only add to candles if in our desired 6-month window
+        if (allDates.includes(date)) {
+          candles.push(candle);
+        }
+      }
+      //make sure to fill all the missing dates in the cache as there
+      //is no data for Sundays and other holidays
+      //Holes will provoke requery next time - the way we've designed it
+      for (const missingDate of missingDates) {
+        const cacheFile = path.join(cache_dir, `${missingDate}.json`);
+        if (!fs.existsSync(cacheFile)) {
+          fs.closeSync(fs.openSync(cacheFile, 'w'));
+        }
+      }
     }
-  });
+
+    // Sort candles by date (in case file load order was out of order)
+    candles.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    const summary = await yahooFinance.quoteSummary(symbol, {
+      modules: ['summaryDetail'],
+    });
+
+    res.json({
+      summary: summary.summaryDetail,
+      candles,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: 'Failed to fetch historical prices',
+      details: err.message,
+    });
+  }
+});
 
 app.listen(PORT, () => {
   console.log(`ETF holdings proxy server running on http://localhost:${PORT}`);
