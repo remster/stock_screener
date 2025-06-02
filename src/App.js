@@ -15,6 +15,18 @@ const sectors = [
   { symbol: "XLC", name: "Communication (XLC)" },
 ];
 
+const closestToSma = (days, normalize=true) => {
+  const distance = (stock) => {
+    let delta = stock["close"] - stock["sma"+days];
+    if (normalize) {
+      delta /= stock["close"];
+    }
+    console.log(stock["symbol"] + " distance to sma"+days + " = "+delta);
+    return delta;
+  }
+  return (a,b) => distance(a) - distance(b);
+}
+
 const SectorChartsDashboard = () => {
   const [globalTopStocks, setGlobalTopStocks] = useState([]);
   const hasFetched = useRef(false);
@@ -23,7 +35,9 @@ const SectorChartsDashboard = () => {
     const fetchTopStocks = async () => {
       if (hasFetched.current) return;
       hasFetched.current = true;
-      const stocks = await screen(sectors);
+      const stocks = await screen(sectors, {
+        "sort": closestToSma(50, true)
+      });
       setGlobalTopStocks(stocks.slice(0,5));
     };
     fetchTopStocks();

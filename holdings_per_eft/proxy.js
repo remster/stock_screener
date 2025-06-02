@@ -70,10 +70,10 @@ app.get('/holdings/:ticker', async (req, res) => {
 
 const formatDate = (date) => date.toISOString().slice(0, 10);
 
-const getLastSixMonthsDates = () => {
+const getLastDates = (days) => {
   const now = new Date();
   const past = new Date();
-  past.setMonth(now.getMonth() - 6);
+  past.setMonth(now.getMonth() - (days * 2/30.));
 
   const dates = [];
   for (let d = new Date(past); d <= now; d.setDate(d.getDate() + 1)) {
@@ -88,12 +88,12 @@ const ensureCacheDir = async () => {
   }
 };
 
-app.get('/history/:symbol', async (req, res) => {
+app.get('/history/:symbol/:days', async (req, res) => {
   try {
-    const { symbol } = req.params;
+    const { symbol, days } = req.params;
     await ensureCacheDir();
-    const allDates = getLastSixMonthsDates();
-    const candles = [];
+    const allDates = getLastDates(days);
+    let candles = [];
 
     const missingDates = [];
 
@@ -127,6 +127,7 @@ app.get('/history/:symbol', async (req, res) => {
       for (const candle of result) {
         const date = formatDate(new Date(candle.date)); // force to YYYY-MM-DD
         const cacheFile = path.join(cache_dir, `${date}.json`);
+        candle.date = candle.date.toISOString();
 
         // Cache if not already written
         if (!fs.existsSync(cacheFile)) {
@@ -151,6 +152,10 @@ app.get('/history/:symbol', async (req, res) => {
 
     // Sort candles by date (in case file load order was out of order)
     candles.sort((a, b) => new Date(a.date) - new Date(b.date));
+    // remove dupes
+    candles = candles.filter((candle, i) => {
+      return i == 0 || candle.date != candles[i-1].date
+    });
 
     const summary = await yahooFinance.quoteSummary(symbol, {
       modules: ['summaryDetail'],
