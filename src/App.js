@@ -36,9 +36,16 @@ const SectorChartsDashboard = () => {
       if (hasFetched.current) return;
       hasFetched.current = true;
       const stocks = await screen(sectors, {
-        "sort": closestToSma(50, true)
+        "sort": closestToSma(50, true),
+        "filter": (stock) => {
+          const smas = stock["close"] > stock["sma50"] && stock["sma50"] > stock["sma100"];
+          const mcap = stock["marketCap"] > Math.pow(10,9);
+          const volume = stock["volume"] > 1.5 * stock["averageVolume10days"];
+          const pa = stock["forwardPE"] < 25;
+          return smas && mcap && volume && pa;
+        }
       });
-      setGlobalTopStocks(stocks.slice(0,5));
+      setGlobalTopStocks(stocks.slice(0,10));
     };
     fetchTopStocks();
   }, []);
@@ -64,7 +71,7 @@ const SectorChartsDashboard = () => {
         new window.TradingView.widget({
           container_id: containerId,
           autosize: true,
-          symbol: `NASDAQ:${stock.symbol}`,
+          symbol: `${stock.symbol}`,
           interval: "D",
           timezone: "Etc/UTC",
           theme: "light",
