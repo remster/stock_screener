@@ -41,8 +41,9 @@ const SectorChartsDashboard = () => {
           const smas = stock["close"] > stock["sma50"] && stock["sma50"] > stock["sma100"];
           const mcap = stock["marketCap"] > Math.pow(10,9);
           const volume = stock["volume"] > 1.5 * stock["averageVolume10days"];
-          const pa = stock["forwardPE"] < 25;
-          return smas && mcap && volume && pa;
+          const pa = stock["forwardPE"] < 25.;
+          const rsi = stock["rsi14"] < 72.;
+          return smas && mcap && volume && pa && rsi;
         }
       });
       setGlobalTopStocks(stocks.slice(0,10));
@@ -80,7 +81,10 @@ const SectorChartsDashboard = () => {
           hide_top_toolbar: false,
           hide_side_toolbar: false,
           allow_symbol_change: false,
-          studies: [{ id: "MASimple@tv-basicstudies", inputs: { length: 50 } }],
+          studies: [
+            { id: "MAExp@tv-basicstudies", inputs: { length: 50, color: "red" } },
+            { id: "MAExp@tv-basicstudies", inputs: { length: 100 } }
+          ],
           withdateranges: true,
           details: false,
           hideideas: true,
