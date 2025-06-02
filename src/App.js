@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import screenSector from "./SectorScreener";
+import screen from "./Screener";
 
 const sectors = [
   { symbol: "XLK", name: "Technology (XLK)" },
@@ -16,37 +16,63 @@ const sectors = [
 ];
 
 const SectorChartsDashboard = () => {
-  const [sectorTopStocks, setSectorTopStocks] = useState({});
+  const [globalTopStocks, setGlobalTopStocks] = useState([]);
   const hasFetched = useRef(false);
 
   useEffect(() => {
-    const fetchAllSectors = async () => {
+    const fetchTopStocks = async () => {
       if (hasFetched.current) return;
       hasFetched.current = true;
-      const data = {};
-      for (const { symbol } of sectors) {
-        try {
-          const results = await screenSector(symbol);
-          data[symbol] = results.slice(0, 3);
-        } catch (err) {
-          console.error(`Failed to fetch top stocks for ${symbol}`, err);
-        }
-      }
-      setSectorTopStocks(data);
+      const stocks = await screen(sectors);
+      setGlobalTopStocks(stocks.slice(0,5));
     };
-
-    fetchAllSectors();
+    fetchTopStocks();
   }, []);
 
+  // Load TradingView script if needed
   useEffect(() => {
-    if (!window.TradingView || Object.keys(sectorTopStocks).length === 0) return;
+    if (!window.TradingView) {
+      const script = document.createElement("script");
+      script.src = "https://s3.tradingview.com/tv.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
 
-    sectors.forEach(({ symbol }, sectorIndex) => {
-      const sectorContainerId = `sector_chart_${sectorIndex}`;
-      const sectorContainer = document.getElementById(sectorContainerId);
-      if (sectorContainer) {
+  // Render widgets when TradingView and stock data are ready
+  useEffect(() => {
+    if (!window.TradingView || globalTopStocks.length === 0) return;
+
+    globalTopStocks.forEach((stock, index) => {
+      const containerId = `global_stock_chart_${index}`;
+      const el = document.getElementById(containerId);
+      if (el) {
         new window.TradingView.widget({
-          container_id: sectorContainerId,
+          container_id: containerId,
+          autosize: true,
+          symbol: `NASDAQ:${stock.symbol}`,
+          interval: "D",
+          timezone: "Etc/UTC",
+          theme: "light",
+          style: "1",
+          toolbar_bg: "#f1f3f6",
+          hide_top_toolbar: false,
+          hide_side_toolbar: false,
+          allow_symbol_change: false,
+          studies: [{ id: "MASimple@tv-basicstudies", inputs: { length: 50 } }],
+          withdateranges: true,
+          details: false,
+          hideideas: true,
+        });
+      }
+    });
+
+    sectors.forEach(({ symbol }, index) => {
+      const containerId = `sector_chart_${index}`;
+      const el = document.getElementById(containerId);
+      if (el) {
+        new window.TradingView.widget({
+          container_id: containerId,
           autosize: true,
           symbol: `AMEX:${symbol}`,
           interval: "D",
@@ -66,86 +92,66 @@ const SectorChartsDashboard = () => {
           hideideas: true,
         });
       }
-
-      const topStocks = sectorTopStocks[symbol] || [];
-      topStocks.forEach((stock, index) => {
-        const stockContainerId = `stock_chart_${symbol}_${index}`;
-        const stockContainer = document.getElementById(stockContainerId);
-        if (stockContainer) {
-          new window.TradingView.widget({
-            container_id: stockContainerId,
-            autosize: true,
-            symbol: stock.ticker,
-            interval: "D",
-            timezone: "Etc/UTC",
-            theme: "light",
-            style: "1",
-            toolbar_bg: "#f1f3f6",
-            hide_top_toolbar: false,
-            hide_side_toolbar: false,
-            allow_symbol_change: false,
-            studies: [
-              { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
-            ],
-            withdateranges: true,
-            details: false,
-            hideideas: true,
-          });
-        }
-      });
     });
-  }, [sectorTopStocks]);
-
-  useEffect(() => {
-    if (!window.TradingView) {
-      const script = document.createElement("script");
-      script.src = "https://s3.tradingview.com/tv.js";
-      script.async = true;
-      script.onload = () => {
-        //console.log("TradingView loaded.");
-      };
-      document.body.appendChild(script);
-    }
-  }, []);
-
+  }, [globalTopStocks]);
 
   return (
-    <div style={{ padding: 20, fontFamily: "Arial, sans-serif", backgroundColor: "#f2f2f2" }}>
+    <div
+      style={{
+        padding: 20,
+        fontFamily: "Arial, sans-serif",
+        backgroundColor: "#f2f2f2"
+      }}
+    >
       <h1 style={{ textAlign: "center", marginBottom: 30 }}>SPDR Sector SMA Dashboard</h1>
 
-      {sectors.map(({ symbol, name }, sectorIndex) => (
-        <div
-          key={symbol}
-          style={{
-            marginBottom: 60,
-            background: "#fff",
-            borderRadius: 10,
-            padding: 20,
-            boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
-          }}
-        >
-          <h2 style={{ marginBottom: 10 }}>{name}</h2>
-
-          {/* Sector Chart */}
-          <div id={`sector_chart_${sectorIndex}`} style={{ height: 600, marginBottom: 20 }}></div>
-
-          {/* Top 4 Stock Charts */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(480px, 1fr))",
-              gap: 20
-            }}
-          >
-            {(sectorTopStocks[symbol] || []).map((stock, index) => (
-              <div key={index}>
-                <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>{stock.name}</div>
-                <div id={`stock_chart_${symbol}_${index}`} style={{ height: 400 }}></div>
-              </div>
-            ))}
-          </div>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: 20
+        }}
+      >
+        {/* Left Column: Global Top Stock Charts */}
+        <div>
+          <h2 style={{ marginBottom: 20 }}>Global Top Stocks</h2>
+          {globalTopStocks.map((stock, index) => (
+            <div
+              key={stock.symbol}
+              style={{
+                background: "#fff",
+                borderRadius: 10,
+                padding: 16,
+                marginBottom: 20,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+              }}
+            >
+              <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>{stock.name}</div>
+              <div id={`global_stock_chart_${index}`} style={{ height: 400 }}></div>
+            </div>
+          ))}
         </div>
-      ))}
+
+        {/* Right Column: Sector Charts */}
+        <div>
+          <h2 style={{ marginBottom: 20 }}>Sector Charts</h2>
+          {sectors.map(({ symbol, name }, index) => (
+            <div
+              key={symbol}
+              style={{
+                background: "#fff",
+                borderRadius: 10,
+                padding: 16,
+                marginBottom: 40,
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+              }}
+            >
+              <div style={{ fontWeight: "bold", fontSize: 18, marginBottom: 10 }}>{name}</div>
+              <div id={`sector_chart_${index}`} style={{ height: 600 }}></div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };
