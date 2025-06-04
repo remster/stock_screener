@@ -150,12 +150,30 @@ const SectorChartsDashboard = () => {
                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
               }}
             >
-              <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>
-                {stock.name}{" "}
-                <a href={`https://finance.yahoo.com/chart/${stock.symbol}`} target="_blank">Yahoo</a>{" "}
-                <a href={`https://www.tradingview.com/chart/?symbol=${stock.symbol}`} target="_blank">Trading View</a>{" "}
-                <a href={`https://www.tradevision.io/visualizer/?ticker=${stock.symbol}`} target="_blank">Tradevision</a>{" "}
-                <a href={`https://finviz.com/quote.ashx?t=${stock.symbol}&p=d`} target="_blank">Finviz</a>
+              <div>
+                <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>
+                  {stock.name}
+                </div>
+                <div style={{ marginBottom: 8, fontSize: 12 }}>
+                  <a href={`https://finance.yahoo.com/chart/${stock.symbol}`} target="_blank">Yahoo</a>{" "}
+                  <a href={`https://www.tradingview.com/chart/?symbol=${stock.symbol}`} target="_blank">Trading View</a>{" "}
+                  <a href={`https://www.tradevision.io/visualizer/?ticker=${stock.symbol}`} target="_blank">Tradevision</a>{" "}
+                  <a href={`https://finviz.com/quote.ashx?t=${stock.symbol}&p=d`} target="_blank">Finviz</a>
+                </div>
+                <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <div style={{ display: 'flex' }}>
+                    <div style={{ width: 70, fontWeight: 'bold' }}>rsi14:</div>
+                    <div>{stock.last.rsi14}</div>
+                  </div>
+                  <div style={{ display: 'flex' }}>
+                    <div style={{ width: 70, fontWeight: 'bold' }}>support:</div>
+                    <div>{stock.last.support[0].level.toFixed(2)} / {stock.last.support[0].tests[0].date.split("T")[0]}</div>
+                  </div>
+                  <div style={{ display: 'flex' }}>
+                    <div style={{ width: 70, fontWeight: 'bold' }}>resistance:</div>
+                    <div>{stock.last.resistance[0].level.toFixed(2)} / {stock.last.resistance[0].tests[0].date.split("T")[0]}</div>
+                  </div>
+                </div>
               </div>
               <div id={`global_stock_chart_${index}`} style={{ height: 400 }}></div>
             </div>
