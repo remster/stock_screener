@@ -17,7 +17,7 @@ const sectors = [
 
 const closestToSma = (days, normalize=true) => {
   const distance = (stock) => {
-    let delta = stock.last.close - stock.last.stock["sma"+days];
+    let delta = stock.last.close - stock.last["sma"+days];
     if (normalize) {
       delta /= stock.last.close;
     }
@@ -37,12 +37,13 @@ const SectorChartsDashboard = () => {
       const stocks = await screen(sectors, {
         "sort": closestToSma(50, true),
         "filter": (stock) => {
-          const smas = stock.last.close > stock.last.sma50 && stock.last.sma50 > stock.last.sma100;
-          const mcap = stock.summaryDetail.marketCap > Math.pow(10,9);
-          const volume = stock.last.volume > 1.5 * stock.summaryDetail.averageVolume10days;
-          const pa = stock.summaryDetail.forwardPE < 25.;
-          const rsi = stock.last.rsi14 < 72.;
-          return smas && mcap && volume && pa && rsi;
+          return {
+            smas: stock.last.close > stock.last.sma50 && stock.last.sma50 > stock.last.sma100,
+            mcap: stock.summaryDetail.marketCap > Math.pow(10,9),
+            volume: stock.last.volume > 1.3 * stock.summaryDetail.averageVolume10days,
+            pa: stock.summaryDetail.forwardPE < 35.,
+            rsi: stock.last.rsi14 < 72.
+          };
         }
       });
       setGlobalTopStocks(stocks.slice(0,10));
