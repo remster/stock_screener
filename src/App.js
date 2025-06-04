@@ -17,11 +17,10 @@ const sectors = [
 
 const closestToSma = (days, normalize=true) => {
   const distance = (stock) => {
-    let delta = stock["close"] - stock["sma"+days];
+    let delta = stock.last.close - stock.last.stock["sma"+days];
     if (normalize) {
-      delta /= stock["close"];
+      delta /= stock.last.close;
     }
-    console.log(stock["symbol"] + " distance to sma"+days + " = "+delta);
     return delta;
   }
   return (a,b) => distance(a) - distance(b);
@@ -38,11 +37,11 @@ const SectorChartsDashboard = () => {
       const stocks = await screen(sectors, {
         "sort": closestToSma(50, true),
         "filter": (stock) => {
-          const smas = stock["close"] > stock["sma50"] && stock["sma50"] > stock["sma100"];
-          const mcap = stock["marketCap"] > Math.pow(10,9);
-          const volume = stock["volume"] > 1.5 * stock["averageVolume10days"];
-          const pa = stock["forwardPE"] < 25.;
-          const rsi = stock["rsi14"] < 72.;
+          const smas = stock.last.close > stock.last.sma50 && stock.last.sma50 > stock.last.sma100;
+          const mcap = stock.summaryDetail.marketCap > Math.pow(10,9);
+          const volume = stock.last.volume > 1.5 * stock.summaryDetail.averageVolume10days;
+          const pa = stock.summaryDetail.forwardPE < 25.;
+          const rsi = stock.last.rsi14 < 72.;
           return smas && mcap && volume && pa && rsi;
         }
       });
@@ -151,7 +150,13 @@ const SectorChartsDashboard = () => {
                 boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
               }}
             >
-              <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>{stock.name}</div>
+              <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>
+                {stock.name}{" "}
+                <a href={`https://finance.yahoo.com/chart/${stock.symbol}`} target="_blank">Yahoo</a>{" "}
+                <a href={`https://www.tradingview.com/chart/?symbol=${stock.symbol}`} target="_blank">Trading View</a>{" "}
+                <a href={`https://www.tradevision.io/visualizer/?ticker=${stock.symbol}`} target="_blank">Tradevision</a>{" "}
+                <a href={`https://finviz.com/quote.ashx?t=${stock.symbol}&p=d`} target="_blank">Finviz</a>
+              </div>
               <div id={`global_stock_chart_${index}`} style={{ height: 400 }}></div>
             </div>
           ))}

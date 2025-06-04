@@ -158,11 +158,15 @@ app.get('/history/:symbol/:days', async (req, res) => {
     });
 
     const summary = await yahooFinance.quoteSummary(symbol, {
-      modules: ['summaryDetail'],
+      modules: [
+        'summaryDetail',
+        'financialData',
+        'price'
+      ],
     });
 
     res.json({
-      summary: summary.summaryDetail,
+      summary: summary,
       candles,
     });
   } catch (err) {
