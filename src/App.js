@@ -29,6 +29,7 @@ const closestToSma = (days, normalize=true) => {
 
 const SectorChartsDashboard = () => {
   const [globalTopStocks, setGlobalTopStocks] = useState([]);
+  const [countdown, setCountdown] = useState(0);
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -47,7 +48,7 @@ const SectorChartsDashboard = () => {
           };
         },
         "progress": (to_go) => {
-          console.log(to_go);
+          setCountdown(to_go);
         }
       });
       setGlobalTopStocks(stocks.slice(0,10));
@@ -133,7 +134,9 @@ const SectorChartsDashboard = () => {
       }}
     >
       <h1 style={{ textAlign: "center", marginBottom: 30 }}>SPDR Sector SMA Dashboard</h1>
-
+      <div style={{ textAlign: "center", fontSize: 18, marginBottom: 10 }}>
+        Countdown: {countdown}
+      </div>
       <div
         style={{
           display: "grid",

@@ -242,6 +242,7 @@ const screen = async (sectors, options) => {
         }
     }
     console.log("Screened "+i+" stocks, your filter matched:" + result.length + ", specific filters matched :" + JSON.stringify(matches));
+    options["progress"](0);
     return result.sort(options["sort"]);
 };
 
