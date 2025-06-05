@@ -13,6 +13,7 @@ const sectors = [
   { symbol: "XLB", name: "Materials (XLB)" },
   { symbol: "XLRE", name: "Real Estate (XLRE)" },
   { symbol: "XLC", name: "Communication (XLC)" },
+  { symbol: "IWM", name: "Russel 2000 Small Caps" },
 ];
 
 const closestToSma = (days, normalize=true) => {
@@ -38,12 +39,15 @@ const SectorChartsDashboard = () => {
         "sort": closestToSma(50, true),
         "filter": (stock) => {
           return {
-            smas: stock.last.close > stock.last.sma50 && stock.last.sma50 > stock.last.sma100,
+            rising: stock.last.close > stock.last.sma50 && stock.last.sma50 > stock.last.sma100 && stock.last.close > stock.last.resistance[0].level,
             mcap: stock.summaryDetail.marketCap > Math.pow(10,9),
             volume: stock.last.volume > 1.3 * stock.summaryDetail.averageVolume10days,
             pa: stock.summaryDetail.forwardPE < 35.,
             rsi: stock.last.rsi14 < 72.
           };
+        },
+        "progress": (to_go) => {
+          console.log(to_go);
         }
       });
       setGlobalTopStocks(stocks.slice(0,10));
@@ -82,7 +86,7 @@ const SectorChartsDashboard = () => {
           hide_side_toolbar: false,
           allow_symbol_change: false,
           studies: [
-            { id: "MAExp@tv-basicstudies", inputs: { length: 50, color: "red" } },
+            { id: "MAExp@tv-basicstudies", inputs: { length: 50 }, overrides: { "plot.color": "#FF0000" } },
             { id: "MAExp@tv-basicstudies", inputs: { length: 100 } }
           ],
           withdateranges: true,
@@ -110,7 +114,7 @@ const SectorChartsDashboard = () => {
           allow_symbol_change: false,
           studies: [
             { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
-            { id: "MASimple@tv-basicstudies", inputs: { length: 150 } },
+            { id: "MASimple@ tv-basicstudies", inputs: { length: 150 } },
           ],
           withdateranges: true,
           details: false,
@@ -153,7 +157,7 @@ const SectorChartsDashboard = () => {
             >
               <div>
                 <div style={{ fontWeight: "bold", marginBottom: 8, fontSize: 16 }}>
-                  {stock.name}
+                  [{stock.symbol}] {stock.name}
                 </div>
                 <div style={{ marginBottom: 8, fontSize: 12 }}>
                   <a href={`https://finance.yahoo.com/chart/${stock.symbol}`} target="_blank">Yahoo</a>{" "}
@@ -161,7 +165,7 @@ const SectorChartsDashboard = () => {
                   <a href={`https://www.tradevision.io/visualizer/?ticker=${stock.symbol}`} target="_blank">Tradevision</a>{" "}
                   <a href={`https://finviz.com/quote.ashx?t=${stock.symbol}&p=d`} target="_blank">Finviz</a>
                 </div>
-                <div style={{ marginBottom: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{  marginBottom: 8, fontSize: 12, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <div style={{ display: 'flex' }}>
                     <div style={{ width: 70, fontWeight: 'bold' }}>rsi14:</div>
                     <div>{stock.last.rsi14}</div>

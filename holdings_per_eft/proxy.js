@@ -5,6 +5,7 @@ import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import cors from 'cors';
 import yahooFinance from 'yahoo-finance2';
+import { parse } from 'csv-parse/sync';
 
 const app = express();
 app.use(cors());
@@ -28,7 +29,7 @@ async function downloadFile(url, dest) {
   });
 }
 
-async function fetchAndParseHoldings(ticker) {
+async function fetchAndParseSSGAHoldings(ticker) {
   const url = `https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-${ticker.toLowerCase()}.xlsx`;
   const filePath = path.join(CACHE_DIR, `${ticker.toLowerCase()}.xlsx`);
   const jsonCachePath = path.join(CACHE_DIR, `${ticker.toLowerCase()}.json`);
@@ -49,18 +50,81 @@ async function fetchAndParseHoldings(ticker) {
   const workbook = XLSX.readFile(filePath);
   const sheetName = workbook.SheetNames[0]; // Assume first sheet has data
   const worksheet = workbook.Sheets[sheetName];
-  const jsonData = XLSX.utils.sheet_to_json(worksheet);
+  const jsonData = XLSX.utils.sheet_to_json(worksheet).slice(3);
+  let tickerKey;
+  for (let key in jsonData[0]) {
+      if (key.includes("Select Sector SPDR®")) {
+          tickerKey = key;
+          break;
+      }
+  }
+
+  const result = jsonData.filter(
+    (row) => tickerKey in row && row[tickerKey] !== "-"
+  ).map(row => ({
+      name: row["Fund Name:"],
+      ticker: row[tickerKey].replace(".", "-"),
+      weight: parseFloat(row["__EMPTY_2"]),
+  }));
 
   // Cache parsed JSON
-  fs.writeFileSync(jsonCachePath, JSON.stringify(jsonData), 'utf8');
+  fs.writeFileSync(jsonCachePath, JSON.stringify(result), 'utf8');
 
-  return jsonData;
+  return result;
+}
+
+async function fetchAndParseIsharesHoldings(ticker) {
+  const lowerTicker = ticker.toUpperCase(); // iShares tickers are uppercase in URL
+  const url = `https://www.ishares.com/us/products/etf-investments/${lowerTicker.toLowerCase()}?fileType=csv&fileName=${lowerTicker}_holdings&dataType=fund`;
+  const csvUrl = `https://www.ishares.com/us/products/239710/ishares-russell-2000-etf/1467271812596.ajax?fileType=csv&fileName=${lowerTicker}_holdings&dataType=fund`;
+
+  const filePath = path.join(CACHE_DIR, `${lowerTicker}.csv`);
+  const jsonCachePath = path.join(CACHE_DIR, `${lowerTicker}.json`);
+
+  if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR);
+
+  if (fs.existsSync(jsonCachePath)) {
+    const stats = fs.statSync(jsonCachePath);
+    if (Date.now() - stats.mtimeMs < CACHE_DURATION) {
+      const cachedJson = fs.readFileSync(jsonCachePath, "utf8");
+      return JSON.parse(cachedJson);
+    }
+  }
+
+  console.log(`Fetching iShares ETF data: ${csvUrl}`);
+  await downloadFile(csvUrl, filePath);
+
+  const csvData = fs.readFileSync(filePath, "utf8").split("\n \n")[1];
+  const records = parse(csvData, {
+    columns: true,
+    skip_empty_lines: true
+  });
+
+  // Normalize relevant fields
+  const normalized = records
+    .filter(r => r["Ticker"] && r["Name"]) // Ensure valid rows
+    .map(r => ({
+      ticker: r["Ticker"].trim(),
+      name: r["Name"].trim(),
+      weight: parseFloat(r["Weight (%)"]) || 0
+    }));
+
+  fs.writeFileSync(jsonCachePath, JSON.stringify(normalized, null, 2), "utf8");
+
+  return normalized;
 }
 
 app.get('/holdings/:ticker', async (req, res) => {
   const { ticker } = req.params;
   try {
-    const data = await fetchAndParseHoldings(ticker);
+    const SSGA_TICKERS = ['XLK', 'XLF', 'XLV', 'XLE', 'XLI', 'XLY', 'XLP', 'XLU', 'XLB', 'XLRE', 'XLC'];
+    let data;
+    if (SSGA_TICKERS.includes(ticker.toUpperCase())) {
+      data = await fetchAndParseSSGAHoldings(ticker);
+    } else {
+      data = await fetchAndParseIsharesHoldings(ticker);
+    }
+
     res.json(data);
   } catch (error) {
     console.error(`Error fetching holdings for ${ticker}:`, error);
