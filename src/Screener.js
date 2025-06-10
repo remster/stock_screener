@@ -236,6 +236,7 @@ const screen = async (sectors, options) => {
             }
             if (match) {
               result.push(data);
+              console.log(result.length + " matched the filter");
             }
         } catch (e) {
             console.error(`Error ${e} when fetching ${symbol}`)

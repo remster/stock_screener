@@ -14,6 +14,7 @@ const sectors = [
   { symbol: "XLRE", name: "Real Estate (XLRE)" },
   { symbol: "XLC", name: "Communication (XLC)" },
   { symbol: "IWM", name: "Russel 2000 Small Caps" },
+  { symbol: "ITA", name: "Aerospace and Defence" },
 ];
 
 const closestToSma = (days, normalize=true) => {
@@ -42,7 +43,7 @@ const SectorChartsDashboard = () => {
           return {
             rising: stock.last.close > stock.last.sma50 && stock.last.sma50 > stock.last.sma100 && stock.last.close > stock.last.resistance[0].level,
             mcap: stock.summaryDetail.marketCap > Math.pow(10,9),
-            volume: stock.last.volume > 1.3 * stock.summaryDetail.averageVolume10days,
+            volume: stock.last.volume > 1.6 * stock.summaryDetail.averageVolume10days,
             pa: stock.summaryDetail.forwardPE < 35.,
             rsi: stock.last.rsi14 < 72.
           };
@@ -66,42 +67,14 @@ const SectorChartsDashboard = () => {
     }
   }, []);
 
-  // Render widgets when TradingView and stock data are ready
   useEffect(() => {
-    if (!window.TradingView || globalTopStocks.length === 0) return;
-
-    globalTopStocks.forEach((stock, index) => {
-      const containerId = `global_stock_chart_${index}`;
-      const el = document.getElementById(containerId);
-      if (el) {
-        new window.TradingView.widget({
-          container_id: containerId,
-          autosize: true,
-          symbol: `${stock.symbol}`,
-          interval: "D",
-          timezone: "Etc/UTC",
-          theme: "light",
-          style: "1",
-          toolbar_bg: "#f1f3f6",
-          hide_top_toolbar: false,
-          hide_side_toolbar: false,
-          allow_symbol_change: false,
-          studies: [
-            { id: "MAExp@tv-basicstudies", inputs: { length: 50 }, overrides: { "plot.color": "#FF0000" } },
-            { id: "MAExp@tv-basicstudies", inputs: { length: 100 } }
-          ],
-          withdateranges: true,
-          details: false,
-          hideideas: true,
-        });
-      }
-    });
+    if (!window.TradingView) return;
 
     sectors.forEach(({ symbol }, index) => {
       const containerId = `sector_chart_${index}`;
       const el = document.getElementById(containerId);
       if (el) {
-        new window.TradingView.widget({
+        const widget = new window.TradingView.widget({
           container_id: containerId,
           autosize: true,
           symbol: `AMEX:${symbol}`,
@@ -114,8 +87,48 @@ const SectorChartsDashboard = () => {
           hide_side_toolbar: false,
           allow_symbol_change: false,
           studies: [
-            { id: "MASimple@tv-basicstudies", inputs: { length: 50 } },
-            { id: "MASimple@ tv-basicstudies", inputs: { length: 150 } },
+            { id: "MASimple@tv-basicstudies",
+              inputs: { length: 50 }
+            },
+            { id: "MASimple@tv-basicstudies", inputs: { length: 150 } },
+          ],
+          withdateranges: true,
+          details: false,
+          hideideas: true,
+        });
+      }
+    });
+  }, [window.TradingView]);
+
+  // Render widgets when TradingView and stock data are ready
+  useEffect(() => {
+    if (!window.TradingView || globalTopStocks.length === 0) return;
+
+    globalTopStocks.forEach((stock, index) => {
+      const containerId = `global_stock_chart_${index}`;
+      const el = document.getElementById(containerId);
+      if (el) {
+        const widget = new window.TradingView.widget({
+          container_id: containerId,
+          autosize: true,
+          symbol: `${stock.symbol}`,
+          interval: "D",
+          timezone: "Etc/UTC",
+          theme: "light",
+          style: "1",
+          toolbar_bg: "#f1f3f6",
+          hide_top_toolbar: false,
+          hide_side_toolbar: false,
+          allow_symbol_change: false,
+          studies: [
+            {
+              id: "MAExp@tv-basicstudies",
+              inputs: { length: 50 },
+            },
+            {
+              id: "MAExp@tv-basicstudies",
+              inputs: { length: 100 },
+            },
           ],
           withdateranges: true,
           details: false,
