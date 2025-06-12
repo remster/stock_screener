@@ -62,6 +62,49 @@ const SectorChartsDashboard = () => {
     fetchTopStocks();
   }, []);
 
+  // Load TradingView script if needed
+  useEffect(() => {
+    if (!window.TradingView) {
+      const script = document.createElement("script");
+      script.src = "https://s3.tradingview.com/tv.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!window.TradingView) return;
+
+    sectors.forEach(({ symbol }, index) => {
+      const containerId = `sector_chart_${index}`;
+      const el = document.getElementById(containerId);
+      if (el) {
+        const widget = new window.TradingView.widget({
+          container_id: containerId,
+          autosize: true,
+          symbol: `AMEX:${symbol}`,
+          interval: "D",
+          timezone: "Etc/UTC",
+          theme: "light",
+          style: "1",
+          toolbar_bg: "#f1f3f6",
+          hide_top_toolbar: false,
+          hide_side_toolbar: false,
+          allow_symbol_change: false,
+          studies: [
+            { id: "MASimple@tv-basicstudies",
+              inputs: { length: 50 }
+            },
+            { id: "MASimple@tv-basicstudies", inputs: { length: 150 } },
+          ],
+          withdateranges: true,
+          details: false,
+          hideideas: true,
+        });
+      }
+    });
+  }, [window.TradingView]);
+
   return (
     <div
       style={{
@@ -189,7 +232,7 @@ const SectorChartsDashboard = () => {
         {/* Right: Sector ETFs */}
         <div>
           <h2 style={{ marginBottom: 20 }}>Sector Charts</h2>
-          {sectors.map(({ symbol, name }) => (
+          {sectors.map(({ symbol, name }, index) => (
             <div
               key={symbol}
               style={{
@@ -197,22 +240,11 @@ const SectorChartsDashboard = () => {
                 borderRadius: 10,
                 padding: 16,
                 marginBottom: 40,
-                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
               }}
             >
-              <div
-                style={{
-                  fontWeight: "bold",
-                  fontSize: 18,
-                  marginBottom: 10,
-                }}
-              >
-                {name}
-              </div>
-              {/* You’ll need to fetch chart data for each ETF */}
-              {/* This assumes you already have `history` field */}
-              {/* Replace with real data or load in useEffect */}
-              <PriceChart data={[]} height={300} />
+              <div style={{ fontWeight: "bold", fontSize: 18, marginBottom: 10 }}>{name}</div>
+              <div id={`sector_chart_${index}`} style={{ height: 600 }}></div>
             </div>
           ))}
         </div>
