@@ -4,7 +4,7 @@ import PriceChart from "./PriceChart";
 
 const sectors = [
   { symbol: "XLK", name: "Technology (XLK)" },
-  /*{ symbol: "XLF", name: "Financials (XLF)" },
+  { symbol: "XLF", name: "Financials (XLF)" },
   { symbol: "XLV", name: "Health Care (XLV)" },
   { symbol: "XLE", name: "Energy (XLE)" },
   { symbol: "XLI", name: "Industrials (XLI)" },
@@ -15,7 +15,7 @@ const sectors = [
   { symbol: "XLRE", name: "Real Estate (XLRE)" },
   { symbol: "XLC", name: "Communication (XLC)" },
   { symbol: "IWM", name: "Russel 2000 Small Caps" },
-  { symbol: "ITA", name: "Aerospace and Defence" },*/
+  { symbol: "ITA", name: "Aerospace and Defence" },
 ];
 
 const closestToSma = (days, normalize = true) => {
@@ -45,12 +45,12 @@ const SectorChartsDashboard = () => {
             stock.last.close > stock.last.sma50 &&
             stock.last.sma50 > stock.last.sma100 &&
             stock.last.close > stock.last.resistance[0].level,
-          mcap: true || stock.summaryDetail.marketCap > 1e9,
+          mcap: stock.summaryDetail.marketCap > 1e9,
           volume:
-            true || stock.last.volume >
-            1.6 * stock.summaryDetail.averageVolume10days,
-          pa: true || stock.summaryDetail.forwardPE < 35,
-          rsi: true || stock.last.rsi14 < 72,
+            stock.last.volume >
+            1.4 * stock.summaryDetail.averageVolume10days,
+          pa: stock.summaryDetail.forwardPE < 35,
+          rsi: stock.last.rsi14 < 72,
         }),
         progress: (to_go) => {
           setCountdown(to_go);
@@ -190,28 +190,10 @@ const SectorChartsDashboard = () => {
                     <div style={{ width: 70, fontWeight: "bold" }}>rsi14:</div>
                     <div>{stock.last.rsi14}</div>
                   </div>
-                  <div style={{ display: "flex" }}>
-                    <div style={{ width: 70, fontWeight: "bold" }}>
-                      support:
-                    </div>
-                    <div>
-                      {stock.last.support[0].level.toFixed(2)} /{" "}
-                      {stock.last.support[0].tests[0].date.split("T")[0]}
-                    </div>
-                  </div>
-                  <div style={{ display: "flex" }}>
-                    <div style={{ width: 70, fontWeight: "bold" }}>
-                      resistance:
-                    </div>
-                    <div>
-                      {stock.last.resistance[0].level.toFixed(2)} /{" "}
-                      {stock.last.resistance[0].tests[0].date.split("T")[0]}
-                    </div>
-                  </div>
                 </div>
               </div>
               <PriceChart
-                data={stock.candles}
+                data={stock}
                 priceLines={[
                   {
                     price: stock.last.support[0].level,

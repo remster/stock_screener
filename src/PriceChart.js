@@ -31,7 +31,7 @@ const PriceChart = ({ data, priceLines = [], height = 400 }) => {
     const series = chart.addSeries(CandlestickSeries);
 
     // Convert ISO datetime to yyyy-mm-dd format expected by lightweight-charts
-    series.setData(data.map(item => ({
+    series.setData(data.candles.map(item => ({
       time: item.date.split('T')[0], // Convert "2024-08-12T13:30:00.000Z" to "2024-08-12"
       open: item.open,
       high: item.high,
@@ -39,17 +39,28 @@ const PriceChart = ({ data, priceLines = [], height = 400 }) => {
       close: item.close
     })));
 
-    // Draw price lines (e.g., support, resistance)
-    priceLines.forEach(({ price, color, title }) => {
+    let max_resistance = 2;
+    data.last.resistance.slice(0,max_resistance).forEach((r, i) => {
       series.createPriceLine({
-        price,
-        color: color || "red",
-        lineWidth: 2,
+        price: r.level,
+        color: "red",
+        lineWidth: max_resistance-i,
         lineStyle: 0,
         axisLabelVisible: true,
-        title: title || "",
+        title: "res",
       });
     });
+    data.last.support.slice(0,max_resistance).forEach((r, i) => {
+      series.createPriceLine({
+        price: r.level,
+        color: "green",
+        lineWidth: max_resistance-i,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: "sup",
+      });
+    });
+
 
     const observer = new ResizeObserver(() => {
       chart.applyOptions({ width: chartContainerRef.current.clientWidth });

@@ -209,7 +209,7 @@ const screen = async (sectors, options) => {
             data["candles"] = data_raw.candles;
             data["symbol"] = symbol;
             data["name"] = data_raw.summary.price.shortName;
-            const supres = support_resistance(data.candles);
+            const supres = support_resistance(data.candles.slice(0,150));
             const last_candle = data.candles[data.candles.length-1];
             data["last"] = {
                 close: last_candle.close,
