@@ -24,6 +24,14 @@ const SectorDetailPage = () => {
   const sectorName = sectors[sectorSymbol];
 
   useEffect(() => {
+    if (sectorName) {
+      document.title = `${sectorName}`;
+    } else {
+      document.title = "Unknown Sector";
+    }
+  }, [sectorName]);
+
+  useEffect(() => {
     if (!sectorSymbol) return;
 
     const fetchTopStocks = async () => {
@@ -33,12 +41,12 @@ const SectorDetailPage = () => {
         sort: closestToSma(50, true),
         filter: (stock) => ({
           rising:
-            stock.last.close > stock.last.sma50 &&
+            true || stock.last.close > stock.last.sma50 &&
             stock.last.sma50 > stock.last.sma100 &&
             stock.last.close > stock.last.resistance[0].level,
           mcap: stock.summaryDetail.marketCap > 1e9,
           volume:
-            stock.last.volume >
+            true || stock.last.volume >
             1.4 * stock.summaryDetail.averageVolume10days,
           pa: stock.summaryDetail.forwardPE < 35,
           rsi: stock.last.rsi14 < 72,
@@ -68,7 +76,7 @@ const SectorDetailPage = () => {
         backgroundColor: "#f2f2f2",
       }}
     >
-      <h1 style={{ textAlign: "center", marginBottom: 10 }}>dupka {sectorSymbol} {sectorName}</h1>
+      <h1 style={{ textAlign: "center", marginBottom: 10 }}>{sectorName}</h1>
       <div style={{ textAlign: "center", fontSize: 18, marginBottom: 10 }}>
         Countdown: {countdown}
       </div>
@@ -120,18 +128,6 @@ const SectorDetailPage = () => {
           </div>
           <PriceChart
             data={stock}
-            priceLines={[
-              {
-                price: stock.last.support[0].level,
-                title: "Support",
-                color: "green",
-              },
-              {
-                price: stock.last.resistance[0].level,
-                title: "Resistance",
-                color: "red",
-              },
-            ]}
           />
         </div>
       ))}

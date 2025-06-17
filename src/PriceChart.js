@@ -1,8 +1,8 @@
 // PriceChart.js
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries } from 'lightweight-charts';
+import { createChart, CandlestickSeries, LineSeries } from 'lightweight-charts';
 
-const PriceChart = ({ data, priceLines = [], height = 400 }) => {
+const PriceChart = ({ data, height = 400 }) => {
   const chartContainerRef = useRef();
 
   useEffect(() => {
@@ -39,6 +39,9 @@ const PriceChart = ({ data, priceLines = [], height = 400 }) => {
       close: item.close
     })));
 
+    //
+    // support and resistance
+    //
     let max_resistance = 2;
     data.last.resistance.slice(0,max_resistance).forEach((r, i) => {
       series.createPriceLine({
@@ -61,6 +64,24 @@ const PriceChart = ({ data, priceLines = [], height = 400 }) => {
       });
     });
 
+    //
+    // SMAs
+    //
+    const smas = Object.keys(data.last).filter((k) => k.startsWith("sma")).sort(function (a, b) {
+      if (a.length == b.length) {
+        return a > b ? 1 : -1;
+      }
+      return a.length > b.length ? 1 : -1;
+    });
+    const sma_colors = ['#FF0000', '#2962FF', "#000000"];
+    smas.forEach((sma, i) => {
+      chart.addSeries(
+        LineSeries, { color: sma_colors[i], lineWidth: 1 }
+      ).setData(data.candles.map(item => ({
+        time: item.date.split('T')[0], // Convert "2024-08-12T13:30:00.000Z" to "2024-08-12"
+        value: item[sma]
+      })));
+    });
 
     const observer = new ResizeObserver(() => {
       chart.applyOptions({ width: chartContainerRef.current.clientWidth });
@@ -71,7 +92,7 @@ const PriceChart = ({ data, priceLines = [], height = 400 }) => {
       observer.disconnect();
       chart.remove();
     };
-  }, [data, priceLines]);
+  }, [data]);
 
   return <div ref={chartContainerRef} style={{ width: "100%" }} />;
 };

@@ -13,10 +13,22 @@ const fetchHoldings = async (etfSymbol) => {
     }
 }
 
-const sma = (candles, period) => {
+const insert_sma = (candles, period) => {
     if (candles.length >= period) {
-        const samples = candles.slice(-period);
-        return samples.reduce((cum, sample) => cum + sample.close, 0) / samples.length;
+      let tail_idx = 0;
+      let head_idx = 0;
+      let sum = 0;
+      while (head_idx < candles.length) {
+        sum += candles[head_idx].close;
+        if (head_idx-tail_idx > period) {
+          sum -= candles[tail_idx].close;
+          tail_idx++;
+        }
+        if (head_idx-tail_idx == period) {
+          candles[head_idx]["sma"+period] = sum/period;
+        }
+        head_idx++;
+      }
     }
 }
 
@@ -211,13 +223,16 @@ const screen = async (sectors, options) => {
             data["name"] = data_raw.summary.price.shortName;
             const supres = support_resistance(data.candles.slice(0,150));
             const last_candle = data.candles[data.candles.length-1];
+            insert_sma(data.candles, 50);
+            insert_sma(data.candles, 100);
+            insert_sma(data.candles, 150);
             data["last"] = {
                 close: last_candle.close,
                 volume: last_candle.volume,
                 date: last_candle.date,
-                sma50: sma(data.candles, 50),
-                sma100: sma(data.candles, 100),
-                sma150: sma(data.candles, 150),
+                sma50: data.candles["sma50"],
+                sma100: data.candles["sma100"],
+                sma150: data.candles["sma150"],
                 rsi14: rsi(data.candles, 14),
                 support: supres.supports,
                 resistance: supres.resistances
