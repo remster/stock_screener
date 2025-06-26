@@ -1,6 +1,6 @@
 // PriceChart.js
 import { useEffect, useRef } from "react";
-import { createChart, CandlestickSeries, LineSeries } from 'lightweight-charts';
+import { createChart, CandlestickSeries, LineSeries, HistogramSeries } from 'lightweight-charts';
 
 const PriceChart = ({ data, height = 400 }) => {
   const chartContainerRef = useRef();
@@ -31,13 +31,49 @@ const PriceChart = ({ data, height = 400 }) => {
     const series = chart.addSeries(CandlestickSeries);
 
     // Convert ISO datetime to yyyy-mm-dd format expected by lightweight-charts
-    series.setData(data.candles.map(item => ({
+    const candleData = data.candles.map(item => ({
       time: item.date.split('T')[0], // Convert "2024-08-12T13:30:00.000Z" to "2024-08-12"
       open: item.open,
       high: item.high,
       low: item.low,
       close: item.close
-    })));
+    }));
+
+    series.setData(candleData);
+
+    // Create volume series
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      color: '#26a69a',
+      priceFormat: {
+        type: 'volume',
+      },
+      priceScaleId: 'volume',
+    });
+
+    // Configure the volume price scale to take bottom 30%
+    chart.priceScale('volume').applyOptions({
+      scaleMargins: {
+        top: 0.7,
+        bottom: 0,
+      },
+    });
+
+    // Configure the main price scale to take top 70%
+    chart.priceScale('right').applyOptions({
+      scaleMargins: {
+        top: 0,
+        bottom: 0.3,
+      },
+    });
+
+    // Add volume data
+    const volumeData = data.candles.map(item => ({
+      time: item.date.split('T')[0],
+      value: item.volume,
+      color: item.close >= item.open ? '#26a69a' : '#ef5350', // Green for up, red for down
+    }));
+
+    volumeSeries.setData(volumeData);
 
     //
     // support and resistance
