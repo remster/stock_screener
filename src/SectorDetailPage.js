@@ -41,15 +41,14 @@ const SectorDetailPage = () => {
         sort: closestToSma(50, true),
         filter: (stock) => ({
           rising:
-            true || stock.last.close > stock.last.sma50 &&
-            stock.last.sma50 > stock.last.sma100 &&
-            stock.last.close > stock.last.resistance[0].level,
+            stock.last.close > stock.last.sma50 &&
+            stock.last.sma50 > stock.last.sma100,
           mcap: stock.summaryDetail.marketCap > 1e9,
           volume:
-            true || stock.last.volume >
-            1.4 * stock.summaryDetail.averageVolume10days,
-          pa: stock.summaryDetail.forwardPE < 35,
-          rsi: stock.last.rsi14 < 72,
+            stock.last.volume >
+            1.2 * stock.summaryDetail.averageVolume10days,
+          pa: stock.summaryDetail.forwardPE < 50,
+          rsi: stock.last.rsi14 < 73,
         }),
         progress: (to_go) => setCountdown(to_go),
       });

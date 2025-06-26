@@ -219,10 +219,17 @@ const screen = async (sectors, options) => {
             const data_raw = await data_req.json();
             const data = data_raw.summary;
             data["candles"] = data_raw.candles;
+            let last_candle = data.candles[data.candles.length-1];
+            let plast_candle = data.candles[data.candles.length-2];
+            if (last_candle.date.split("T")[1] != plast_candle.date.split("T")[1]) {
+              //we want to filter out the current candle if the market is still open
+              //as the close or volume aren't representative or comparable to other candles
+              data["candles"].pop();
+              last_candle = plast_candle
+            }
             data["symbol"] = symbol;
             data["name"] = data_raw.summary.price.shortName;
-            const supres = support_resistance(data.candles.slice(0,150));
-            const last_candle = data.candles[data.candles.length-1];
+            const supres = support_resistance(data.candles.slice(-150));
             insert_sma(data.candles, 50);
             insert_sma(data.candles, 100);
             insert_sma(data.candles, 150);
@@ -230,9 +237,9 @@ const screen = async (sectors, options) => {
                 close: last_candle.close,
                 volume: last_candle.volume,
                 date: last_candle.date,
-                sma50: data.candles["sma50"],
-                sma100: data.candles["sma100"],
-                sma150: data.candles["sma150"],
+                sma50: last_candle["sma50"],
+                sma100: last_candle["sma100"],
+                sma150: last_candle["sma150"],
                 rsi14: rsi(data.candles, 14),
                 support: supres.supports,
                 resistance: supres.resistances
@@ -251,7 +258,6 @@ const screen = async (sectors, options) => {
             }
             if (match) {
               result.push(data);
-              console.log(result.length + " matched the filter");
             }
         } catch (e) {
             console.error(`Error ${e} when fetching ${symbol}`)
