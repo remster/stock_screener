@@ -15,6 +15,17 @@ const closestToSma = (days, normalize = true) => {
   return (a, b) => distance(a) - distance(b);
 };
 
+const monthHigh = (candles, monthDays = 30, recentCandles = 3, marginPcnt = 2) => {
+  candles = candles.slice(-monthDays);
+  recentCandles = candles.splice(-recentCandles);
+  const recentMax = recentCandles.reduce((max, candle) => Math.max(max, candle.close), 0);
+  const pastMax = candles.reduce((max, candle) => Math.max(max, candle.close), 0);
+  if (pastMax * (1 + marginPcnt/100) < recentMax) {
+    return true;
+  }
+  return false;
+}
+
 const SectorDetailPage = () => {
   const [topStocks, setTopStocks] = useState([]);
   const [countdown, setCountdown] = useState(0);
@@ -34,22 +45,30 @@ const SectorDetailPage = () => {
   useEffect(() => {
     if (!sectorSymbol) return;
 
+    const elliotsFilter = (stock) => ({
+      monthHigh: monthHigh(stock.candles),
+      mcap: stock.summaryDetail.marketCap > 2e9,
+      rsi: stock.last.rsi14 <= 73,
+    });
+
+    const basicScreener = (stock) => ({
+      rising:
+        stock.last.close > stock.last.sma50 &&
+        stock.last.sma50 > stock.last.sma100,
+      mcap: stock.summaryDetail.marketCap > 1e9,
+      volume:
+        stock.last.volume >
+        1.2 * stock.summaryDetail.averageVolume10days,
+      pa: stock.summaryDetail.forwardPE < 50,
+      rsi: stock.last.rsi14 < 73,
+    });
+
     const fetchTopStocks = async () => {
       const stocks = await screen([
         { symbol: sectorSymbol, name: sectorSymbol }
       ], {
         sort: closestToSma(50, true),
-        filter: (stock) => ({
-          rising:
-            stock.last.close > stock.last.sma50 &&
-            stock.last.sma50 > stock.last.sma100,
-          mcap: stock.summaryDetail.marketCap > 1e9,
-          volume:
-            stock.last.volume >
-            1.2 * stock.summaryDetail.averageVolume10days,
-          pa: stock.summaryDetail.forwardPE < 50,
-          rsi: stock.last.rsi14 < 73,
-        }),
+        filter: elliotsFilter,
         progress: (to_go) => setCountdown(to_go),
       });
       setTopStocks(stocks.slice(0, 10));
