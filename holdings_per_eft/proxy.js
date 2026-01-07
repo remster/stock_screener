@@ -4,7 +4,8 @@ import path from 'path';
 import fetch from 'node-fetch';
 import XLSX from 'xlsx';
 import cors from 'cors';
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from "yahoo-finance2";
+const yahooFinance = new YahooFinance({});
 import { parse } from 'csv-parse/sync';
 
 const app = express();
@@ -182,25 +183,36 @@ app.get('/history/:symbol/:days', async (req, res) => {
       const to = new Date();
       console.log(`Fetching missing range for ${symbol}: ${formatDate(from)} to ${formatDate(to)}`);
 
-      const result = await yahooFinance.historical(symbol, {
+      // Use yahooFinance.chart instead of historical
+      const chartResult = await yahooFinance.chart(symbol, {
         period1: from,
         period2: to,
         interval: '1d',
       });
 
-      for (const candle of result) {
-        const date = formatDate(new Date(candle.date)); // force to YYYY-MM-DD
-        const cacheFile = path.join(cache_dir, `${date}.json`);
-        candle.date = candle.date.toISOString();
-
-        // Cache if not already written
-        if (!fs.existsSync(cacheFile)) {
-          fs.writeFileSync(cacheFile, JSON.stringify(candle, null, 2), 'utf-8');
-        }
-
-        // Only add to candles if in our desired 6-month window
-        if (allDates.includes(date)) {
-          candles.push(candle);
+      // chartResult contains .timestamp (array of UNIX seconds) and .indicators.quote[0] (object with arrays)
+      if (chartResult && chartResult.timestamp && chartResult.indicators && chartResult.indicators.quote && chartResult.indicators.quote[0]) {
+        const quote = chartResult.indicators.quote[0];
+        for (let i = 0; i < chartResult.timestamp.length; i++) {
+          const dateObj = new Date(chartResult.timestamp[i] * 1000);
+          const date = formatDate(dateObj);
+          const candle = {
+            date: dateObj.toISOString(),
+            open: quote.open ? quote.open[i] : null,
+            high: quote.high ? quote.high[i] : null,
+            low: quote.low ? quote.low[i] : null,
+            close: quote.close ? quote.close[i] : null,
+            volume: quote.volume ? quote.volume[i] : null
+          };
+          const cacheFile = path.join(cache_dir, `${date}.json`);
+          // Cache if not already written
+          if (!fs.existsSync(cacheFile)) {
+            fs.writeFileSync(cacheFile, JSON.stringify(candle, null, 2), 'utf-8');
+          }
+          // Only add to candles if in our desired 6-month window
+          if (allDates.includes(date)) {
+            candles.push(candle);
+          }
         }
       }
       //make sure to fill all the missing dates in the cache as there
