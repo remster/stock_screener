@@ -157,16 +157,15 @@ app.get('/history/:symbol/:days', async (req, res) => {
   try {
     const { symbol, days } = req.params;
     await ensureCacheDir();
-    const allDates = getLastDates(days);
-    let candles = [];
-
-    const missingDates = [];
-
     const cache_dir = path.join(CACHE_DIR, `${symbol}`)
+    let candles = [];
     if (!fs.existsSync(cache_dir)) {
       fs.mkdirSync(cache_dir);
     }
-    for (const date of allDates) {
+    let allDates = getLastDates(days);
+    let i = 0;
+    for (; i < allDates.length; i++) {
+      const date = allDates[i];
       const cacheFile = path.join(cache_dir, `${date}.json`);
       if (fs.existsSync(cacheFile)) {
         const cached = fs.readFileSync(cacheFile, 'utf-8');
@@ -174,13 +173,14 @@ app.get('/history/:symbol/:days', async (req, res) => {
           candles.push(JSON.parse(cached));
         }
       } else {
-        missingDates.push(date);
+        break;
       }
     }
-
-    if (missingDates.length > 0) {
-      const from = new Date(missingDates[0]);
+    allDates = allDates.slice(i);
+    if (allDates.length > 0) {
+      const from = new Date(allDates[0]);
       const to = new Date();
+      allDates = new Set(allDates);
       console.log(`Fetching missing range for ${symbol}: ${formatDate(from)} to ${formatDate(to)}`);
 
       // Use yahooFinance.chart instead of historical
@@ -189,36 +189,24 @@ app.get('/history/:symbol/:days', async (req, res) => {
         period2: to,
         interval: '1d',
       });
-
-      // chartResult contains .timestamp (array of UNIX seconds) and .indicators.quote[0] (object with arrays)
-      if (chartResult && chartResult.timestamp && chartResult.indicators && chartResult.indicators.quote && chartResult.indicators.quote[0]) {
-        const quote = chartResult.indicators.quote[0];
-        for (let i = 0; i < chartResult.timestamp.length; i++) {
-          const dateObj = new Date(chartResult.timestamp[i] * 1000);
-          const date = formatDate(dateObj);
-          const candle = {
-            date: dateObj.toISOString(),
-            open: quote.open ? quote.open[i] : null,
-            high: quote.high ? quote.high[i] : null,
-            low: quote.low ? quote.low[i] : null,
-            close: quote.close ? quote.close[i] : null,
-            volume: quote.volume ? quote.volume[i] : null
-          };
-          const cacheFile = path.join(cache_dir, `${date}.json`);
-          // Cache if not already written
-          if (!fs.existsSync(cacheFile)) {
-            fs.writeFileSync(cacheFile, JSON.stringify(candle, null, 2), 'utf-8');
-          }
-          // Only add to candles if in our desired 6-month window
-          if (allDates.includes(date)) {
-            candles.push(candle);
-          }
-        }
+      if (!chartResult) {
+        throw new Error('No chart data returned from Yahoo Finance');
       }
+      candles = candles.concat(chartResult.quotes.map((candle, i) => {
+        candle["date"] = candle.date.toISOString()
+        const date = candle["date"].split('T')[0];
+        const cacheFile = path.join(cache_dir, `${date}.json`);
+        allDates.delete(date);
+        if (!fs.existsSync(cacheFile)) {
+          fs.writeFileSync(cacheFile, JSON.stringify(candle, null, 2), 'utf-8');
+        }
+        return candle;
+      }));
+
       //make sure to fill all the missing dates in the cache as there
       //is no data for Sundays and other holidays
       //Holes will provoke requery next time - the way we've designed it
-      for (const missingDate of missingDates) {
+      for (const missingDate of allDates) {
         const cacheFile = path.join(cache_dir, `${missingDate}.json`);
         if (!fs.existsSync(cacheFile)) {
           fs.closeSync(fs.openSync(cacheFile, 'w'));
