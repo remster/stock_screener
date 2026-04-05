@@ -90,68 +90,37 @@ function formatDate(date: Date): string {
 }
 
 export async function fetchHistory(symbol: string, days: number): Promise<Candle[]> {
-  const symbolDir = `history/${symbol}`;
-  ensureCacheDir(path.join(CACHE_DIR, symbolDir));
+  const key = `history/${symbol}_${days}d.json`;
+  if (isCacheFresh(CACHE_DIR, key, TTL.FUNDAMENTALS)) {
+    return cacheRead(CACHE_DIR, key) as Candle[];
+  }
 
   const now = new Date();
   const past = new Date();
   past.setMonth(now.getMonth() - Math.ceil((days * 2) / 30));
 
-  const allDates: string[] = [];
-  for (const d = new Date(past); d <= now; d.setDate(d.getDate() + 1)) {
-    allDates.push(formatDate(new Date(d)));
-  }
+  const chartResult = await yahooFinance.chart(symbol, {
+    period1: past,
+    period2: now,
+    interval: "1d",
+  });
 
   let candles: Candle[] = [];
-  let firstMissing = 0;
-  for (; firstMissing < allDates.length; firstMissing++) {
-    const cached = cacheRead(CACHE_DIR, `${symbolDir}/${allDates[firstMissing]}.json`);
-    if (cached === null) break;
-    if (typeof cached === "object" && cached !== null && "date" in cached) {
-      candles.push(cached as Candle);
-    }
-  }
-
-  const missingDates = allDates.slice(firstMissing);
-
-  if (missingDates.length > 0) {
-    const from = new Date(missingDates[0]);
-    const missingSet = new Set(missingDates);
-
-    const chartResult = await yahooFinance.chart(symbol, {
-        period1: from,
-        period2: now,
-        interval: "1d",
-      });
-
-    if (chartResult?.quotes) {
-      for (const quote of chartResult.quotes) {
-        const candle: Candle = {
-          date: quote.date.toISOString(),
-          open: quote.open ?? 0,
-          high: quote.high ?? 0,
-          low: quote.low ?? 0,
-          close: quote.close ?? 0,
-          volume: quote.volume ?? 0,
-        };
-        const dateStr = candle.date.split("T")[0];
-        missingSet.delete(dateStr);
-        cacheWrite(CACHE_DIR, `${symbolDir}/${dateStr}.json`, candle);
-        candles.push(candle);
-      }
-    }
-
-    for (const missing of missingSet) {
-      const filePath = path.join(CACHE_DIR, symbolDir, `${missing}.json`);
-      if (!fs.existsSync(filePath)) {
-        fs.closeSync(fs.openSync(filePath, "w"));
-      }
-    }
+  if (chartResult?.quotes) {
+    candles = chartResult.quotes.map((quote) => ({
+      date: quote.date.toISOString(),
+      open: quote.open ?? 0,
+      high: quote.high ?? 0,
+      low: quote.low ?? 0,
+      close: quote.close ?? 0,
+      volume: quote.volume ?? 0,
+    }));
   }
 
   candles.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   candles = candles.filter((c, i) => i === 0 || c.date !== candles[i - 1].date);
 
+  cacheWrite(CACHE_DIR, key, candles);
   return candles;
 }
 

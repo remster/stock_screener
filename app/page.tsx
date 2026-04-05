@@ -20,13 +20,14 @@ function defaultParams(strategy: Strategy): Record<string, number> {
 
 function StrategyCard({ strategy }: { strategy: Strategy }) {
   const router = useRouter();
-  const { results, progress, status, run } = useScreen();
+  const { results, progress, status, run } = useScreen(`dashboard-${strategy.slug}`);
 
   useEffect(() => {
+    if (status !== "idle") return;
     const params = getStoredParams(strategy.slug, defaultParams(strategy));
     run(strategy.slug, params);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [strategy.slug]);
+  }, [strategy.slug, status]);
 
   const percent =
     progress && progress.total > 0

@@ -33,15 +33,16 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        const allSymbols: string[] = [];
+        const symbolSet = new Set<string>();
         for (const sector of activeSectors) {
           try {
             const holdings = await fetchHoldings(sector);
-            allSymbols.push(...holdings.map((h) => h.ticker));
+            for (const h of holdings) symbolSet.add(h.ticker);
           } catch (e) {
             send("error", { sector, message: `Failed to fetch holdings: ${e}` });
           }
         }
+        const allSymbols = Array.from(symbolSet);
 
         const total = allSymbols.length;
         let scanned = 0;
