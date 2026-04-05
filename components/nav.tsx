@@ -9,6 +9,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 const navItems = [
   { label: "Dashboard", href: "/" },
   { label: "Strategies", href: "/strategies" },
+  { label: "  Elliot's", href: "/strategies/elliots" },
+  { label: "  Breakout", href: "/strategies/sector-breakout" },
+  { label: "  Compare", href: "/strategies/compare" },
   { label: "Glossary", href: "/glossary" },
 ];
 
