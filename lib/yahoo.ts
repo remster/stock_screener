@@ -1,10 +1,12 @@
 import YahooFinance from "yahoo-finance2";
+
+const yahooFinance = new YahooFinance();
+import * as XLSX from "xlsx";
+import { parse as csvParse } from "csv-parse/sync";
 import { cacheRead, cacheWrite, isCacheFresh, ensureCacheDir } from "./cache";
 import { Candle, ETFHolding } from "./types";
 import fs from "fs";
 import path from "path";
-
-const yahooFinance = new YahooFinance({});
 const CACHE_DIR = path.resolve(process.cwd(), ".cache");
 
 const TTL = {
@@ -20,8 +22,6 @@ async function fetchSSGAHoldings(ticker: string): Promise<ETFHolding[]> {
     return cacheRead(CACHE_DIR, key) as ETFHolding[];
   }
 
-  const { default: fetch } = await import("node-fetch");
-  const { default: XLSX } = await import("xlsx");
   const url = `https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-${ticker.toLowerCase()}.xlsx`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to fetch SSGA holdings: ${res.statusText}`);
@@ -55,8 +55,6 @@ async function fetchIsharesHoldings(ticker: string): Promise<ETFHolding[]> {
     return cacheRead(CACHE_DIR, key) as ETFHolding[];
   }
 
-  const { default: fetch } = await import("node-fetch");
-  const { parse } = await import("csv-parse/sync");
   const csvUrl = `https://www.ishares.com/us/products/239710/ishares-russell-2000-etf/1467271812596.ajax?fileType=csv&fileName=${upper}_holdings&dataType=fund`;
 
   const res = await fetch(csvUrl);
@@ -64,7 +62,7 @@ async function fetchIsharesHoldings(ticker: string): Promise<ETFHolding[]> {
 
   const text = await res.text();
   const csvData = text.split("\n \n")[1];
-  const records = parse(csvData, { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+  const records = csvParse(csvData, { columns: true, skip_empty_lines: true }) as Record<string, string>[];
 
   const result: ETFHolding[] = records
     .filter((r) => r["Ticker"] && r["Name"])
@@ -121,10 +119,10 @@ export async function fetchHistory(symbol: string, days: number): Promise<Candle
     const missingSet = new Set(missingDates);
 
     const chartResult = await yahooFinance.chart(symbol, {
-      period1: from,
-      period2: now,
-      interval: "1d",
-    });
+        period1: from,
+        period2: now,
+        interval: "1d",
+      });
 
     if (chartResult?.quotes) {
       for (const quote of chartResult.quotes) {
