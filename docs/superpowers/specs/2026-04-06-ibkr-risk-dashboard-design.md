@@ -10,15 +10,17 @@
 
 **Gateway prerequisite:** The user manually runs the Client Portal Gateway JAR (`java -jar clientportal.gw.jar`) and logs in via browser at `https://localhost:5000` before using the risk features. Our app does not start, stop, or manage the gateway process.
 
-**Configuration:** Gateway URL via environment variable `IBKR_GATEWAY_URL` (defaults to `https://localhost:5000/v1/api`).
+**Configuration:** Gateway URL via environment variable `IBKR_GATEWAY_URL` (defaults to `https://localhost:5000/v1/portal`).
 
 **Exported functions (read-only only):**
 
-- `getAuthStatus()` — `GET /iserver/auth/status`. Returns `{ authenticated: boolean }`.
-- `getPositions(accountId: string)` — `GET /portfolio/{accountId}/positions`. Returns array of positions.
-- `getOrders()` — `GET /iserver/account/orders`. Returns array of open orders.
+- `getAuthStatus()` — `GET /iserver/auth/status`. Returns `{ authenticated: boolean, competing: boolean, ... }`.
+- `getAccounts()` — `GET /portfolio/accounts`. Returns array of account objects with `id` field.
+- `getPositions(accountId: string)` — `GET /portfolio/{accountId}/positions/0`. Returns array of position objects (page 0). Key fields: `conid`, `contractDesc`, `position`, `avgCost`, `mktPrice`, `mktValue`, `unrealizedPnl`, `ticker`.
+- `getOrders()` — `GET /iserver/account/orders`. Returns `{ orders: [...] }`. Key fields per order: `ticker`, `side` ("BUY"/"SELL"), `orderType` ("Limit"/"Stop"/"Trail"/etc.), `origOrderType` ("LIMIT"/"STP"/"TRAIL"/etc.), `price`, `remainingQuantity`, `filledQuantity`, `status` ("Submitted"/"PreSubmitted"/etc.), `conid`.
 - `getAccountSummary(accountId: string)` — `GET /portfolio/{accountId}/summary`. Returns account summary including net liquidation value.
-- `getAccounts()` — `GET /portfolio/accounts`. Returns available account IDs.
+
+**Note on `origOrderType`:** The orders endpoint returns `orderType` as display text (e.g. "Stop") and `origOrderType` as the canonical code (e.g. "STP"). The risk matching logic should use `origOrderType === "STP"` to identify stop orders.
 
 **No other file imports from or references the gateway URL.** All IBKR data access flows through this client.
 
@@ -41,8 +43,9 @@ interface Position {
 interface Order {
   symbol: string;
   side: "BUY" | "SELL";
-  orderType: string;     // "STP", "LMT", "MKT", "TRAIL", etc.
-  quantity: number;
+  orderType: string;     // display text: "Stop", "Limit", "Trail", etc.
+  origOrderType: string; // canonical code: "STP", "LMT", "MKT", "TRAIL", etc.
+  quantity: number;      // remainingQuantity from IBKR
   price: number;         // stop price for STP, limit price for LMT
   status: string;        // "PreSubmitted", "Submitted", etc.
 }
@@ -116,7 +119,7 @@ interface SimulatedTrade {
 **Location:** `lib/risk/` — pure functions, no side effects, testable with Vitest.
 
 **`positionRisk(position: Position, orders: Order[]): PositionRisk`**
-- Filters orders for matching symbol, `side === "SELL"`, `orderType === "STP"`
+- Filters orders for matching symbol, `side === "SELL"`, `origOrderType === "STP"`
 - For each matching stop: computes `qty * (entry - stop)` and `qty * (current - stop)`
 - Sums across all matching stops
 - `unriskedQty` = position quantity minus sum of stop order quantities (clamped to 0)
