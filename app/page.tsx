@@ -6,6 +6,7 @@ import { getStrategies } from "@/lib/strategies/index";
 import { useScreen } from "@/lib/hooks/use-screen";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { RiskPanel } from "@/components/risk-panel";
 import type { Strategy } from "@/lib/strategies/types";
 
 function getStoredParams(slug: string, defaults: Record<string, number>): Record<string, number> {
@@ -108,6 +109,7 @@ export default function DashboardPage() {
           <StrategyCard key={strategy.slug} strategy={strategy} />
         ))}
       </div>
+      <RiskPanel />
     </div>
   );
 }
