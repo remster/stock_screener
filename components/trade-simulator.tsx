@@ -70,6 +70,7 @@ export function TradeSimulator() {
   const removeTrade = (i: number) => {
     setTrades(trades.filter((_, idx) => idx !== i));
     if (focusedIdx === i) setFocusedIdx(null);
+    else if (focusedIdx !== null && i < focusedIdx) setFocusedIdx(focusedIdx - 1);
   };
 
   const sectorMap = (rs: typeof projected.sectors) =>
