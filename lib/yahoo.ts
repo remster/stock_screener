@@ -141,3 +141,24 @@ export async function fetchFundamentals(symbol: string): Promise<Record<string, 
     return null;
   }
 }
+
+export async function fetchSector(symbol: string): Promise<string> {
+  const key = `sector/${symbol}.json`;
+  if (isCacheFresh(CACHE_DIR, key, TTL.FUNDAMENTALS)) {
+    const cached = cacheRead(CACHE_DIR, key) as { sector: string };
+    return cached.sector;
+  }
+
+  try {
+    const summary = await yahooFinance.quoteSummary(symbol, {
+      modules: ["assetProfile"],
+    });
+    const sector =
+      (summary as { assetProfile?: { sector?: string } }).assetProfile?.sector ?? "Unknown";
+    cacheWrite(CACHE_DIR, key, { sector });
+    return sector;
+  } catch (e) {
+    console.error(`Failed to fetch sector for ${symbol}:`, e);
+    return "Unknown";
+  }
+}
