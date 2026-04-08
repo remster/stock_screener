@@ -16,22 +16,45 @@ function pct(n: number): string {
   return `${(n * 100).toFixed(2)}%`;
 }
 
-function CostLine({ cost, stop, now }: { cost: number; stop: number; now: number }) {
+function MetricRow({
+  label,
+  cost,
+  stop,
+  now,
+  labelClass = "",
+}: {
+  label: React.ReactNode;
+  cost: number;
+  stop: number;
+  now: number;
+  labelClass?: string;
+}) {
   const risked = cost - stop;
   const riskedPct = cost > 0 ? risked / cost : 0;
   const stopColor = stop >= cost ? "text-green-500" : "text-red-500";
   const nowColor = now >= cost ? "text-green-500" : "text-red-500";
   return (
-    <span className="tabular-nums">
-      <span>{fmt(cost)}</span>
-      <span className="text-muted-foreground"> (risked: </span>
-      <span className="text-red-500">{fmt(risked)} / {pct(riskedPct)}</span>
-      <span className="text-muted-foreground">) [</span>
-      <span className={stopColor}>{fmt(stop)}</span>
-      <span className="text-muted-foreground"> ↔ </span>
-      <span className={nowColor}>{fmt(now)}</span>
-      <span className="text-muted-foreground">]</span>
-    </span>
+    <>
+      <td className={`py-1 pr-3 ${labelClass}`}>{label}</td>
+      <td className="py-1 px-3 text-right tabular-nums">{fmt(cost)}</td>
+      <td className="py-1 px-3 text-right tabular-nums text-red-500">
+        {fmt(risked)} / {pct(riskedPct)}
+      </td>
+      <td className={`py-1 px-3 text-right tabular-nums ${stopColor}`}>{fmt(stop)}</td>
+      <td className={`py-1 pl-3 text-right tabular-nums ${nowColor}`}>{fmt(now)}</td>
+    </>
+  );
+}
+
+function MetricHeader() {
+  return (
+    <tr className="text-xs text-muted-foreground border-b">
+      <th className="text-left py-1 pr-3"></th>
+      <th className="text-right py-1 px-3 font-normal">Cost Basis</th>
+      <th className="text-right py-1 px-3 font-normal">Risk</th>
+      <th className="text-right py-1 px-3 font-normal">Pessimistic</th>
+      <th className="text-right py-1 pl-3 font-normal">Current</th>
+    </tr>
   );
 }
 
@@ -62,107 +85,116 @@ export function RiskPanel() {
 
         {snapshot.connected && (
           <>
-            <div className="space-y-1 text-sm">
-              <div>
-                <span className="text-muted-foreground">Net Liquidation: </span>
-                <span className="font-medium tabular-nums">{fmt(risk.netLiquidation)}</span>
-                <span className="text-muted-foreground"> (risked: </span>
-                <span className="text-red-500 tabular-nums">
-                  {fmt(risk.totalCostBasis - risk.totalStopValue)} / {pct(risk.totalRiskPercent)}
-                </span>
-                <span className="text-muted-foreground">)</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Cost Basis: </span>
-                <span className="font-medium">
-                  <CostLine cost={risk.totalCostBasis} stop={risk.totalStopValue} now={risk.totalCurrentValue} />
-                </span>
-              </div>
+            <div className="text-sm">
+              Net Liquidation Value: <span className="font-bold tabular-nums">{fmt(risk.netLiquidation)}</span>{" "}
+              <span className="text-muted-foreground">(risked <span className="font-bold">{pct(risk.totalRiskPercent)}</span>)</span>
             </div>
+            <table className="w-full text-sm">
+            <thead>
+              <MetricHeader />
+            </thead>
 
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Sectors</h3>
-              <div className="divide-y">
-                {risk.sectors.map((s) => (
-                  <div key={s.sector}>
-                    <button
-                      className="w-full flex justify-between gap-4 py-2 text-sm"
+            {/* Portfolio */}
+            <tbody>
+              <tr className="font-semibold border-b">
+                <MetricRow
+                  label="Portfolio"
+                  cost={risk.totalCostBasis}
+                  stop={risk.totalStopValue}
+                  now={risk.totalCurrentValue}
+                />
+              </tr>
+            </tbody>
+
+            {/* Sectors */}
+            <tbody>
+              <tr>
+                <td colSpan={5} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
+              </tr>
+              {risk.sectors.map((s) => {
+                const isOpen = openSectors.has(s.sector);
+                return (
+                  <Fragment key={s.sector}>
+                    <tr
+                      className="border-t cursor-pointer"
                       onClick={() => toggle(openSectors, s.sector, setOpenSectors)}
                     >
-                      <span>{s.sector} ({s.positionCount})</span>
-                      <CostLine cost={s.costBasis} stop={s.stopValue} now={s.currentValue} />
-                    </button>
-                    {openSectors.has(s.sector) && (
-                      <div className="text-xs text-muted-foreground pb-2 pl-2">
-                        Entry → Stop: {fmt(s.totalEntryToStop)} · Current → Stop: {fmt(s.totalCurrentToStop)}
-                      </div>
+                      <MetricRow
+                        label={`${s.sector} (${s.positionCount})`}
+                        cost={s.costBasis}
+                        stop={s.stopValue}
+                        now={s.currentValue}
+                      />
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-muted/30">
+                        <td colSpan={5} className="p-2 text-xs text-muted-foreground">
+                          Entry → Stop: {fmt(s.totalEntryToStop)} · Current → Stop: {fmt(s.totalCurrentToStop)}
+                        </td>
+                      </tr>
                     )}
-                  </div>
-                ))}
-              </div>
-            </div>
+                  </Fragment>
+                );
+              })}
+            </tbody>
 
-            <div>
-              <h3 className="text-sm font-semibold mb-2">Positions</h3>
-              <table className="w-full text-sm">
-                <thead className="text-xs text-muted-foreground">
-                  <tr>
-                    <th className="text-left">Symbol</th>
-                    <th className="text-right">Qty</th>
-                    <th className="text-right">P&amp;L</th>
-                    <th className="text-right">Cost [Stop ↔ Now]</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {snapshot.positions.map((p) => {
-                    const pr = positionRisk(p, snapshot.orders);
-                    const pnl = (p.currentPrice - p.avgEntryPrice) * p.quantity;
-                    const pnlPct = ((p.currentPrice - p.avgEntryPrice) / p.avgEntryPrice) * 100;
-                    const positionOrders = snapshot.orders.filter((o) => o.symbol === p.symbol);
-                    const isOpen = openPositions.has(p.symbol);
-                    return (
-                      <Fragment key={p.symbol}>
-                        <tr
-                          className="border-t cursor-pointer"
-                          onClick={() => toggle(openPositions, p.symbol, setOpenPositions)}
-                        >
-                          <td className="py-1">
+            {/* Positions */}
+            <tbody>
+              <tr>
+                <td colSpan={5} className="pt-3 pb-1 text-sm font-bold">Positions</td>
+              </tr>
+              {snapshot.positions.map((p) => {
+                const pr = positionRisk(p, snapshot.orders);
+                const positionOrders = snapshot.orders.filter((o) => o.symbol === p.symbol);
+                const isOpen = openPositions.has(p.symbol);
+                return (
+                  <Fragment key={p.symbol}>
+                    <tr
+                      className="border-t cursor-pointer"
+                      onClick={() => toggle(openPositions, p.symbol, setOpenPositions)}
+                    >
+                      <MetricRow
+                        label={
+                          <>
                             {p.symbol}
                             {pr.unriskedQty > 0 && (
-                              <span className="ml-1 text-yellow-500" title={`${pr.unriskedQty} shares unprotected`}>⚠</span>
+                              <span
+                                className="ml-1 text-yellow-500"
+                                title={`${pr.unriskedQty} shares unprotected`}
+                              >
+                                ⚠
+                              </span>
                             )}
-                          </td>
-                          <td className="text-right tabular-nums">{p.quantity}</td>
-                          <td className={`text-right tabular-nums ${pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
-                            {fmt(pnl)} ({pnlPct.toFixed(1)}%)
-                          </td>
-                          <td className="text-right">
-                            <CostLine cost={pr.costBasis} stop={pr.stopValue} now={pr.currentValue} />
-                          </td>
-                        </tr>
-                        {isOpen && (
-                          <tr className="bg-muted/30">
-                            <td colSpan={4} className="p-2 text-xs">
-                              {positionOrders.length === 0 ? (
-                                <span className="text-muted-foreground">No pending orders</span>
-                              ) : (
-                                <ul className="space-y-1">
-                                  {positionOrders.map((o, i) => (
-                                    <li key={i}>
-                                      {o.side} {o.orderType} {o.quantity} @ {o.price} ({o.status})
-                                    </li>
-                                  ))}
-                                </ul>
-                              )}
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                            <span className="text-xs text-muted-foreground ml-2">×{p.quantity}</span>
+                          </>
+                        }
+                        cost={pr.costBasis}
+                        stop={pr.stopValue}
+                        now={pr.currentValue}
+                      />
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-muted/30">
+                        <td colSpan={5} className="p-2 text-xs">
+                          {positionOrders.length === 0 ? (
+                            <span className="text-muted-foreground">No pending orders</span>
+                          ) : (
+                            <ul className="space-y-1">
+                              {positionOrders.map((o, i) => (
+                                <li key={i}>
+                                  {o.side} {o.orderType} {o.quantity} @ {o.price} ({o.status})
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
           </>
         )}
       </CardContent>
