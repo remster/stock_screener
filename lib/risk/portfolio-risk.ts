@@ -14,13 +14,24 @@ export function portfolioRisk(
 
   const totalEntryToStop = positionRisks.reduce((sum, r) => sum + r.entryToStopRisk, 0);
   const totalCurrentToStop = positionRisks.reduce((sum, r) => sum + r.currentToStopRisk, 0);
-  const totalRiskPercent = netLiquidation > 0 ? totalCurrentToStop / netLiquidation : 0;
+  const totalCostBasis = positionRisks.reduce((sum, r) => sum + r.costBasis, 0);
+  const totalCurrentValue = positionRisks.reduce((sum, r) => sum + r.currentValue, 0);
+  const totalStopValue = positionRisks.reduce((sum, r) => sum + r.stopValue, 0);
+  // Downside from cost: realized loss on covered shares (E→S) plus unrealized loss on
+  // unprotected shares held at current. Equivalent to (totalCostBasis − totalStopValue).
+  const totalDownside = totalCostBasis - totalStopValue;
+  const totalRiskPercent = netLiquidation > 0 ? totalDownside / netLiquidation : 0;
+  const totalRiskPercentCostBasis = totalCostBasis > 0 ? totalDownside / totalCostBasis : 0;
 
   return {
     netLiquidation,
+    totalCostBasis,
+    totalCurrentValue,
+    totalStopValue,
     totalEntryToStop,
     totalCurrentToStop,
     totalRiskPercent,
+    totalRiskPercentCostBasis,
     sectors,
     positions: positionRisks,
   };

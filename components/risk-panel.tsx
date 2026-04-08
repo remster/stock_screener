@@ -12,6 +12,29 @@ function fmt(n: number): string {
   return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
+function pct(n: number): string {
+  return `${(n * 100).toFixed(2)}%`;
+}
+
+function CostLine({ cost, stop, now }: { cost: number; stop: number; now: number }) {
+  const risked = cost - stop;
+  const riskedPct = cost > 0 ? risked / cost : 0;
+  const stopColor = stop >= cost ? "text-green-500" : "text-red-500";
+  const nowColor = now >= cost ? "text-green-500" : "text-red-500";
+  return (
+    <span className="tabular-nums">
+      <span>{fmt(cost)}</span>
+      <span className="text-muted-foreground"> (risked: </span>
+      <span className="text-red-500">{fmt(risked)} / {pct(riskedPct)}</span>
+      <span className="text-muted-foreground">) [</span>
+      <span className={stopColor}>{fmt(stop)}</span>
+      <span className="text-muted-foreground"> ↔ </span>
+      <span className={nowColor}>{fmt(now)}</span>
+      <span className="text-muted-foreground">]</span>
+    </span>
+  );
+}
+
 export function RiskPanel() {
   const { snapshot, loading, refresh } = useIbkr();
   const [openSectors, setOpenSectors] = useState<Set<string>>(new Set());
@@ -39,11 +62,22 @@ export function RiskPanel() {
 
         {snapshot.connected && (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-              <div><div className="text-muted-foreground">Net Liquidation</div><div className="font-medium">{fmt(risk.netLiquidation)}</div></div>
-              <div><div className="text-muted-foreground">Entry → Stop</div><div className="font-medium">{fmt(risk.totalEntryToStop)}</div></div>
-              <div><div className="text-muted-foreground">Current → Stop</div><div className="font-medium">{fmt(risk.totalCurrentToStop)}</div></div>
-              <div><div className="text-muted-foreground">Risk %</div><div className="font-medium">{(risk.totalRiskPercent * 100).toFixed(2)}%</div></div>
+            <div className="space-y-1 text-sm">
+              <div>
+                <span className="text-muted-foreground">Net Liquidation: </span>
+                <span className="font-medium tabular-nums">{fmt(risk.netLiquidation)}</span>
+                <span className="text-muted-foreground"> (risked: </span>
+                <span className="text-red-500 tabular-nums">
+                  {fmt(risk.totalCostBasis - risk.totalStopValue)} / {pct(risk.totalRiskPercent)}
+                </span>
+                <span className="text-muted-foreground">)</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Cost Basis: </span>
+                <span className="font-medium">
+                  <CostLine cost={risk.totalCostBasis} stop={risk.totalStopValue} now={risk.totalCurrentValue} />
+                </span>
+              </div>
             </div>
 
             <div>
@@ -52,11 +86,11 @@ export function RiskPanel() {
                 {risk.sectors.map((s) => (
                   <div key={s.sector}>
                     <button
-                      className="w-full flex justify-between py-2 text-sm"
+                      className="w-full flex justify-between gap-4 py-2 text-sm"
                       onClick={() => toggle(openSectors, s.sector, setOpenSectors)}
                     >
                       <span>{s.sector} ({s.positionCount})</span>
-                      <span className="tabular-nums">{fmt(s.totalCurrentToStop)}</span>
+                      <CostLine cost={s.costBasis} stop={s.stopValue} now={s.currentValue} />
                     </button>
                     {openSectors.has(s.sector) && (
                       <div className="text-xs text-muted-foreground pb-2 pl-2">
@@ -75,11 +109,8 @@ export function RiskPanel() {
                   <tr>
                     <th className="text-left">Symbol</th>
                     <th className="text-right">Qty</th>
-                    <th className="text-right">Entry</th>
-                    <th className="text-right">Current</th>
                     <th className="text-right">P&amp;L</th>
-                    <th className="text-right">E→S</th>
-                    <th className="text-right">C→S</th>
+                    <th className="text-right">Cost [Stop ↔ Now]</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -102,17 +133,16 @@ export function RiskPanel() {
                             )}
                           </td>
                           <td className="text-right tabular-nums">{p.quantity}</td>
-                          <td className="text-right tabular-nums">{p.avgEntryPrice.toFixed(2)}</td>
-                          <td className="text-right tabular-nums">{p.currentPrice.toFixed(2)}</td>
                           <td className={`text-right tabular-nums ${pnl >= 0 ? "text-green-500" : "text-red-500"}`}>
                             {fmt(pnl)} ({pnlPct.toFixed(1)}%)
                           </td>
-                          <td className="text-right tabular-nums">{fmt(pr.entryToStopRisk)}</td>
-                          <td className="text-right tabular-nums">{fmt(pr.currentToStopRisk)}</td>
+                          <td className="text-right">
+                            <CostLine cost={pr.costBasis} stop={pr.stopValue} now={pr.currentValue} />
+                          </td>
                         </tr>
                         {isOpen && (
                           <tr className="bg-muted/30">
-                            <td colSpan={7} className="p-2 text-xs">
+                            <td colSpan={4} className="p-2 text-xs">
                               {positionOrders.length === 0 ? (
                                 <span className="text-muted-foreground">No pending orders</span>
                               ) : (

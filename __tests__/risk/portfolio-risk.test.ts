@@ -18,7 +18,9 @@ describe("portfolioRisk", () => {
     expect(result.netLiquidation).toBe(100000);
     expect(result.totalEntryToStop).toBe(100 * 5 + 200 * 5);   // 500 + 1000 = 1500
     expect(result.totalCurrentToStop).toBe(100 * 10 + 200 * 15); // 1000 + 3000 = 4000
-    expect(result.totalRiskPercent).toBeCloseTo(4000 / 100000);
+    expect(result.totalCostBasis).toBe(100 * 195 + 200 * 150); // 19500 + 30000 = 49500
+    expect(result.totalRiskPercent).toBeCloseTo(1500 / 100000);
+    expect(result.totalRiskPercentCostBasis).toBeCloseTo(1500 / 49500);
     expect(result.sectors).toHaveLength(2);
     expect(result.positions).toHaveLength(2);
   });

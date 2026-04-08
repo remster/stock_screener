@@ -27,6 +27,9 @@ export interface IbkrSnapshot {
 
 export interface PositionRisk {
   symbol: string;
+  costBasis: number;     // qty * avgEntry
+  currentValue: number;  // qty * currentPrice
+  stopValue: number;     // currentValue - currentToStopRisk (unprotected shares assumed at current)
   entryToStopRisk: number;
   currentToStopRisk: number;
   unriskedQty: number;
@@ -34,6 +37,9 @@ export interface PositionRisk {
 
 export interface SectorRisk {
   sector: string;
+  costBasis: number;
+  currentValue: number;
+  stopValue: number;
   totalEntryToStop: number;
   totalCurrentToStop: number;
   positionCount: number;
@@ -41,9 +47,13 @@ export interface SectorRisk {
 
 export interface PortfolioRisk {
   netLiquidation: number;
+  totalCostBasis: number;
+  totalCurrentValue: number;
+  totalStopValue: number;
   totalEntryToStop: number;
   totalCurrentToStop: number;
-  totalRiskPercent: number;
+  totalRiskPercent: number;          // E→S / net liquidation
+  totalRiskPercentCostBasis: number; // E→S / cost basis (positions only)
   sectors: SectorRisk[];
   positions: PositionRisk[];
 }

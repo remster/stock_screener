@@ -49,15 +49,26 @@ export async function POST() {
       currentPrice: p.mktPrice,
     }));
 
-    const orders: Order[] = (rawOrdersResp.orders ?? []).map((o) => ({
-      symbol: o.ticker,
-      side: o.side,
-      orderType: o.orderType,
-      origOrderType: o.origOrderType,
-      quantity: o.remainingQuantity,
-      price: o.price,
-      status: o.status,
-    }));
+    const orders: Order[] = (rawOrdersResp.orders ?? []).map((o) => {
+      // For stop orders the stop price lives in auxPrice/stop_price, not price.
+      const raw = o as typeof o & { auxPrice?: string; stop_price?: string };
+      const stopPrice = raw.auxPrice ?? raw.stop_price;
+      const price =
+        typeof o.price === "number" && o.price > 0
+          ? o.price
+          : stopPrice
+          ? parseFloat(stopPrice)
+          : 0;
+      return {
+        symbol: o.ticker,
+        side: o.side,
+        orderType: o.orderType,
+        origOrderType: o.origOrderType,
+        quantity: o.remainingQuantity,
+        price,
+        status: o.status,
+      };
+    });
 
     const netLiquidation =
       (summary.netliquidation as { amount?: number } | undefined)?.amount ?? null;
