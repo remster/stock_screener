@@ -5,17 +5,34 @@ import { useIbkr } from "@/lib/hooks/use-ibkr";
 import { portfolioRisk, simulatePortfolioRisk } from "@/lib/risk/portfolio-risk";
 import type { SimulatedTrade } from "@/lib/risk/types";
 import { PriceChart } from "@/components/price-chart";
-import type { StockData } from "@/lib/types";
+import { supportResistance } from "@/lib/indicators/support-resistance";
+import type { Candle, StockData } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 function fmt(n: number): string {
   return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-function delta(before: number, after: number): string {
-  const d = after - before;
-  const sign = d >= 0 ? "+" : "";
-  return `${fmt(before)} → ${fmt(after)} (${sign}${fmt(d)})`;
+function pct(n: number): string {
+  return `${(n * 100).toFixed(2)}%`;
+}
+
+type Metric = { cost: number; stop: number; now: number } | null;
+
+function MetricCell({ m }: { m: Metric }) {
+  if (!m || m.cost === 0) return <span className="text-muted-foreground">—</span>;
+  const risked = m.cost - m.stop;
+  const riskedPct = m.cost > 0 ? risked / m.cost : 0;
+  const stopColor = m.stop >= m.cost ? "text-green-500" : "text-red-500";
+  const nowColor = m.now >= m.cost ? "text-green-500" : "text-red-500";
+  return (
+    <div className="text-xs tabular-nums space-y-0.5">
+      <div><span className="text-muted-foreground">Cost: </span>{fmt(m.cost)}</div>
+      <div><span className="text-muted-foreground">Risk: </span><span className="text-red-500">{fmt(risked)} / {pct(riskedPct)}</span></div>
+      <div><span className="text-muted-foreground">Pessimistic: </span><span className={stopColor}>{fmt(m.stop)}</span></div>
+      <div><span className="text-muted-foreground">Current: </span><span className={nowColor}>{fmt(m.now)}</span></div>
+    </div>
+  );
 }
 
 export function TradeSimulator() {
@@ -46,8 +63,29 @@ export function TradeSimulator() {
       .then((r) => r.json())
       .then((data) => {
         if (cancelled) return;
-        if (data?.candles?.length) {
-          setChartData({ candles: data.candles } as unknown as StockData);
+        const candles: Candle[] | undefined = data?.candles;
+        if (candles?.length) {
+          setChartData({ candles } as unknown as StockData);
+
+          // Auto-fill defaults: entry = last close, stop = highest support below close.
+          const lastClose = candles[candles.length - 1]?.close ?? 0;
+          const sr = supportResistance(candles);
+          const supportBelow = sr.supports
+            .filter((s) => s.level < lastClose)
+            .sort((a, b) => b.level - a.level)[0];
+          const defaultStop = supportBelow?.level ?? 0;
+
+          setTrades((prev) =>
+            prev.map((t) =>
+              t.symbol === focusedSymbol
+                ? {
+                    ...t,
+                    entryPrice: t.entryPrice || lastClose,
+                    stopPrice: t.stopPrice || defaultStop,
+                  }
+                : t,
+            ),
+          );
         } else {
           setChartData(null);
         }
@@ -73,11 +111,37 @@ export function TradeSimulator() {
     else if (focusedIdx !== null && i < focusedIdx) setFocusedIdx(focusedIdx - 1);
   };
 
-  const sectorMap = (rs: typeof projected.sectors) =>
-    new Map(rs.map((s) => [s.sector, s.totalCurrentToStop]));
-  const baseSectors = sectorMap(baseline.sectors);
-  const projSectors = sectorMap(projected.sectors);
-  const allSectors = new Set([...baseSectors.keys(), ...projSectors.keys()]);
+  // Collect unique affected symbols and their sectors.
+  const affectedSymbols = Array.from(
+    new Set(trades.map((t) => t.symbol).filter((s) => s)),
+  );
+  const affectedSectors = Array.from(
+    new Set(
+      affectedSymbols.map(
+        (sym) => snapshot.positions.find((p) => p.symbol === sym)?.sector ?? "Unknown",
+      ),
+    ),
+  );
+
+  const metricFromSector = (rs: typeof baseline.sectors, name: string): Metric => {
+    const s = rs.find((x) => x.sector === name);
+    return s ? { cost: s.costBasis, stop: s.stopValue, now: s.currentValue } : null;
+  };
+  const metricFromPosition = (rs: typeof baseline.positions, sym: string): Metric => {
+    const pr = rs.find((x) => x.symbol === sym);
+    return pr ? { cost: pr.costBasis, stop: pr.stopValue, now: pr.currentValue } : null;
+  };
+
+  const portfolioBase: Metric = {
+    cost: baseline.totalCostBasis,
+    stop: baseline.totalStopValue,
+    now: baseline.totalCurrentValue,
+  };
+  const portfolioNew: Metric = {
+    cost: projected.totalCostBasis,
+    stop: projected.totalStopValue,
+    now: projected.totalCurrentValue,
+  };
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -137,30 +201,57 @@ export function TradeSimulator() {
 
         <Card>
           <CardHeader><CardTitle>Risk Comparison</CardTitle></CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div>
-              <div className="text-muted-foreground">Total Current → Stop</div>
-              <div className="font-medium">{delta(baseline.totalCurrentToStop, projected.totalCurrentToStop)}</div>
+          <CardContent className="space-y-3">
+            <div className="text-sm">
+              Net Liquidation Value:{" "}
+              <span className="font-bold tabular-nums">{fmt(baseline.netLiquidation)}</span>{" "}
+              <span className="text-muted-foreground">
+                (risked <span className="font-bold">{pct(baseline.totalRiskPercent)}</span>
+                {" → "}
+                <span className="font-bold">{pct(projected.totalRiskPercent)}</span>)
+              </span>
             </div>
-            <div>
-              <div className="text-muted-foreground">Risk %</div>
-              <div className="font-medium">
-                {(baseline.totalRiskPercent * 100).toFixed(2)}% → {(projected.totalRiskPercent * 100).toFixed(2)}%
-              </div>
-            </div>
-            <div>
-              <div className="text-muted-foreground mb-1">Sectors</div>
-              <ul className="space-y-1">
-                {Array.from(allSectors).map((sec) => (
-                  <li key={sec} className="flex justify-between">
-                    <span>{sec}</span>
-                    <span className="tabular-nums">
-                      {delta(baseSectors.get(sec) ?? 0, projSectors.get(sec) ?? 0)}
-                    </span>
-                  </li>
+
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-xs text-muted-foreground border-b">
+                  <th className="text-left py-1 pr-3"></th>
+                  <th className="text-left py-1 px-3 font-normal">Risk</th>
+                  <th className="text-left py-1 pl-3 font-normal">New Risk</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-b align-top">
+                  <td className="py-2 pr-3 font-bold">Portfolio</td>
+                  <td className="py-2 px-3"><MetricCell m={portfolioBase} /></td>
+                  <td className="py-2 pl-3"><MetricCell m={portfolioNew} /></td>
+                </tr>
+                {affectedSectors.length > 0 && (
+                  <tr>
+                    <td colSpan={3} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
+                  </tr>
+                )}
+                {affectedSectors.map((sec) => (
+                  <tr key={`sec-${sec}`} className="border-b align-top">
+                    <td className="py-2 pr-3 font-bold">{sec}</td>
+                    <td className="py-2 px-3"><MetricCell m={metricFromSector(baseline.sectors, sec)} /></td>
+                    <td className="py-2 pl-3"><MetricCell m={metricFromSector(projected.sectors, sec)} /></td>
+                  </tr>
                 ))}
-              </ul>
-            </div>
+                {affectedSymbols.length > 0 && (
+                  <tr>
+                    <td colSpan={3} className="pt-3 pb-1 text-sm font-bold">Positions</td>
+                  </tr>
+                )}
+                {affectedSymbols.map((sym) => (
+                  <tr key={`sym-${sym}`} className="border-b align-top">
+                    <td className="py-2 pr-3 font-bold">{sym}</td>
+                    <td className="py-2 px-3"><MetricCell m={metricFromPosition(baseline.positions, sym)} /></td>
+                    <td className="py-2 pl-3"><MetricCell m={metricFromPosition(projected.positions, sym)} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </CardContent>
         </Card>
       </div>

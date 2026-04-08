@@ -38,10 +38,10 @@ export function PriceChart({ data, height = 400 }: PriceChartProps) {
     );
 
     const maxLines = 2;
-    data.last.resistance.slice(0, maxLines).forEach((r, i) => {
+    data.last?.resistance?.slice(0, maxLines).forEach((r, i) => {
       candleSeries.createPriceLine({ price: r.level, color: "red", lineWidth: (maxLines - i) as 1 | 2 | 3 | 4, lineStyle: 0, axisLabelVisible: true, title: "res" });
     });
-    data.last.support.slice(0, maxLines).forEach((s, i) => {
+    data.last?.support?.slice(0, maxLines).forEach((s, i) => {
       candleSeries.createPriceLine({ price: s.level, color: "green", lineWidth: (maxLines - i) as 1 | 2 | 3 | 4, lineStyle: 0, axisLabelVisible: true, title: "sup" });
     });
 
