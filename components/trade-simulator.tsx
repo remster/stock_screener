@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useIbkr } from "@/lib/hooks/use-ibkr";
 import { portfolioRisk, simulatePortfolioRisk } from "@/lib/risk/portfolio-risk";
 import type { SimulatedTrade } from "@/lib/risk/types";
@@ -8,32 +8,13 @@ import { PriceChart } from "@/components/price-chart";
 import { supportResistance } from "@/lib/indicators/support-resistance";
 import type { Candle, StockData } from "@/lib/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-
-function fmt(n: number): string {
-  return n.toLocaleString(undefined, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
-}
-
-function pct(n: number): string {
-  return `${(n * 100).toFixed(2)}%`;
-}
-
-type Metric = { cost: number; stop: number; now: number } | null;
-
-function MetricCell({ m }: { m: Metric }) {
-  if (!m || m.cost === 0) return <span className="text-muted-foreground">—</span>;
-  const risked = m.cost - m.stop;
-  const riskedPct = m.cost > 0 ? risked / m.cost : 0;
-  const stopColor = m.stop >= m.cost ? "text-green-500" : "text-red-500";
-  const nowColor = m.now >= m.cost ? "text-green-500" : "text-red-500";
-  return (
-    <div className="text-xs tabular-nums space-y-0.5">
-      <div><span className="text-muted-foreground">Cost: </span>{fmt(m.cost)}</div>
-      <div><span className="text-muted-foreground">Risk: </span><span className="text-red-500">{fmt(risked)} / {pct(riskedPct)}</span></div>
-      <div><span className="text-muted-foreground">Pessimistic: </span><span className={stopColor}>{fmt(m.stop)}</span></div>
-      <div><span className="text-muted-foreground">Current: </span><span className={nowColor}>{fmt(m.now)}</span></div>
-    </div>
-  );
-}
+import {
+  MetricCells,
+  MetricHeader,
+  fmtUsd as fmt,
+  pct,
+  type Metric,
+} from "./risk-metrics";
 
 export function TradeSimulator() {
   const { snapshot } = useIbkr();
@@ -64,31 +45,33 @@ export function TradeSimulator() {
       .then((data) => {
         if (cancelled) return;
         const candles: Candle[] | undefined = data?.candles;
-        if (candles?.length) {
-          setChartData({ candles } as unknown as StockData);
-
-          // Auto-fill defaults: entry = last close, stop = highest support below close.
-          const lastClose = candles[candles.length - 1]?.close ?? 0;
-          const sr = supportResistance(candles);
-          const supportBelow = sr.supports
-            .filter((s) => s.level < lastClose)
-            .sort((a, b) => b.level - a.level)[0];
-          const defaultStop = supportBelow?.level ?? 0;
-
-          setTrades((prev) =>
-            prev.map((t) =>
-              t.symbol === focusedSymbol
-                ? {
-                    ...t,
-                    entryPrice: t.entryPrice || lastClose,
-                    stopPrice: t.stopPrice || defaultStop,
-                  }
-                : t,
-            ),
-          );
-        } else {
+        if (!candles?.length) {
           setChartData(null);
+          return;
         }
+        const lastClose = candles[candles.length - 1]?.close ?? 0;
+        const sr = supportResistance(candles);
+        const supportBelow = sr.supports
+          .filter((s) => s.level < lastClose)
+          .sort((a, b) => b.level - a.level)[0];
+        const defaultStop = supportBelow?.level ?? 0;
+
+        setChartData({
+          candles,
+          last: { support: sr.supports, resistance: sr.resistances },
+        } as unknown as StockData);
+
+        setTrades((prev) =>
+          prev.map((t) =>
+            t.symbol === focusedSymbol
+              ? {
+                  ...t,
+                  entryPrice: t.entryPrice || lastClose,
+                  stopPrice: t.stopPrice || defaultStop,
+                }
+              : t,
+          ),
+        );
       })
       .catch(() => !cancelled && setChartData(null));
     return () => {
@@ -123,13 +106,13 @@ export function TradeSimulator() {
     ),
   );
 
-  const metricFromSector = (rs: typeof baseline.sectors, name: string): Metric => {
+  const sectorMetric = (rs: typeof baseline.sectors, name: string): Metric => {
     const s = rs.find((x) => x.sector === name);
-    return s ? { cost: s.costBasis, stop: s.stopValue, now: s.currentValue } : null;
+    return s ? { cost: s.costBasis, stop: s.stopValue, now: s.currentValue } : { cost: 0, stop: 0, now: 0 };
   };
-  const metricFromPosition = (rs: typeof baseline.positions, sym: string): Metric => {
+  const positionMetric = (rs: typeof baseline.positions, sym: string): Metric => {
     const pr = rs.find((x) => x.symbol === sym);
-    return pr ? { cost: pr.costBasis, stop: pr.stopValue, now: pr.currentValue } : null;
+    return pr ? { cost: pr.costBasis, stop: pr.stopValue, now: pr.currentValue } : { cost: 0, stop: 0, now: 0 };
   };
 
   const portfolioBase: Metric = {
@@ -142,6 +125,26 @@ export function TradeSimulator() {
     stop: projected.totalStopValue,
     now: projected.totalCurrentValue,
   };
+
+  const renderPair = (
+    label: React.ReactNode,
+    before: Metric,
+    after: Metric,
+    key: string,
+  ) => (
+    <Fragment key={key}>
+      <tr className="align-top">
+        <td className="py-1 pr-3 font-bold">
+          {label} <span className="text-xs font-normal text-muted-foreground">(current)</span>
+        </td>
+        <MetricCells m={before} />
+      </tr>
+      <tr className="border-b align-top">
+        <td className="py-1 pr-3 pl-4 text-xs text-muted-foreground">(new)</td>
+        <MetricCells m={after} />
+      </tr>
+    </Fragment>
+  );
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -214,42 +217,36 @@ export function TradeSimulator() {
 
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-xs text-muted-foreground border-b">
-                  <th className="text-left py-1 pr-3"></th>
-                  <th className="text-left py-1 px-3 font-normal">Risk</th>
-                  <th className="text-left py-1 pl-3 font-normal">New Risk</th>
-                </tr>
+                <MetricHeader />
               </thead>
               <tbody>
-                <tr className="border-b align-top">
-                  <td className="py-2 pr-3 font-bold">Portfolio</td>
-                  <td className="py-2 px-3"><MetricCell m={portfolioBase} /></td>
-                  <td className="py-2 pl-3"><MetricCell m={portfolioNew} /></td>
-                </tr>
+                {renderPair("Portfolio", portfolioBase, portfolioNew, "portfolio")}
                 {affectedSectors.length > 0 && (
                   <tr>
-                    <td colSpan={3} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
+                    <td colSpan={5} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
                   </tr>
                 )}
-                {affectedSectors.map((sec) => (
-                  <tr key={`sec-${sec}`} className="border-b align-top">
-                    <td className="py-2 pr-3 font-bold">{sec}</td>
-                    <td className="py-2 px-3"><MetricCell m={metricFromSector(baseline.sectors, sec)} /></td>
-                    <td className="py-2 pl-3"><MetricCell m={metricFromSector(projected.sectors, sec)} /></td>
-                  </tr>
-                ))}
+                {affectedSectors.map((sec) =>
+                  renderPair(
+                    sec,
+                    sectorMetric(baseline.sectors, sec),
+                    sectorMetric(projected.sectors, sec),
+                    `sec-${sec}`,
+                  ),
+                )}
                 {affectedSymbols.length > 0 && (
                   <tr>
-                    <td colSpan={3} className="pt-3 pb-1 text-sm font-bold">Positions</td>
+                    <td colSpan={5} className="pt-3 pb-1 text-sm font-bold">Positions</td>
                   </tr>
                 )}
-                {affectedSymbols.map((sym) => (
-                  <tr key={`sym-${sym}`} className="border-b align-top">
-                    <td className="py-2 pr-3 font-bold">{sym}</td>
-                    <td className="py-2 px-3"><MetricCell m={metricFromPosition(baseline.positions, sym)} /></td>
-                    <td className="py-2 pl-3"><MetricCell m={metricFromPosition(projected.positions, sym)} /></td>
-                  </tr>
-                ))}
+                {affectedSymbols.map((sym) =>
+                  renderPair(
+                    sym,
+                    positionMetric(baseline.positions, sym),
+                    positionMetric(projected.positions, sym),
+                    `sym-${sym}`,
+                  ),
+                )}
               </tbody>
             </table>
           </CardContent>
