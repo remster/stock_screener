@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Fragment, useState } from "react";
+import { ExpandedStockRow } from "@/components/expanded-stock-row";
 import {
   Table,
   TableBody,
@@ -81,8 +81,8 @@ interface StrategyResultsTableProps {
 }
 
 export function StrategyResultsTable({ results }: StrategyResultsTableProps) {
-  const router = useRouter();
   const [sort, setSort] = useState<SortState>({ key: "fundamentalsScore", direction: "desc" });
+  const [expanded, setExpanded] = useState<string | null>(null);
 
   const filterKeys = results.length > 0 ? Object.keys(results[0].filterResult) : [];
 
@@ -120,25 +120,29 @@ export function StrategyResultsTable({ results }: StrategyResultsTableProps) {
       </TableHeader>
       <TableBody>
         {sorted.map((row) => (
-          <TableRow
-            key={row.symbol}
-            className="cursor-pointer"
-            onClick={() => router.push(`/stock/${row.symbol}`)}
-          >
-            <TableCell className="font-medium">{row.symbol}</TableCell>
-            <TableCell className="max-w-48 truncate">{row.name}</TableCell>
-            <TableCell className="tabular-nums">${row.close.toFixed(2)}</TableCell>
-            <TableCell className="tabular-nums">{row.rsi14 != null ? row.rsi14.toFixed(1) : "—"}</TableCell>
-            <TableCell className="tabular-nums">{row.fundamentalsScore != null ? row.fundamentalsScore.toFixed(1) : "—"}</TableCell>
-            {filterKeys.map((key) => (
-              <TableCell key={key}>
-                <span
-                  className={`inline-block size-2.5 rounded-full ${row.filterResult[key] ? "bg-green-500" : "bg-red-500"}`}
-                  aria-label={row.filterResult[key] ? "pass" : "fail"}
-                />
-              </TableCell>
-            ))}
-          </TableRow>
+          <Fragment key={row.symbol}>
+            <TableRow
+              className="cursor-pointer"
+              onClick={() => setExpanded(expanded === row.symbol ? null : row.symbol)}
+            >
+              <TableCell className="font-medium">{row.symbol}</TableCell>
+              <TableCell className="max-w-48 truncate">{row.name}</TableCell>
+              <TableCell className="tabular-nums">${row.close.toFixed(2)}</TableCell>
+              <TableCell className="tabular-nums">{row.rsi14 != null ? row.rsi14.toFixed(1) : "—"}</TableCell>
+              <TableCell className="tabular-nums">{row.fundamentalsScore != null ? row.fundamentalsScore.toFixed(1) : "—"}</TableCell>
+              {filterKeys.map((key) => (
+                <TableCell key={key}>
+                  <span
+                    className={`inline-block size-2.5 rounded-full ${row.filterResult[key] ? "bg-green-500" : "bg-red-500"}`}
+                    aria-label={row.filterResult[key] ? "pass" : "fail"}
+                  />
+                </TableCell>
+              ))}
+            </TableRow>
+            {expanded === row.symbol && (
+              <ExpandedStockRow symbol={row.symbol} colSpan={5 + filterKeys.length} />
+            )}
+          </Fragment>
         ))}
       </TableBody>
     </Table>
