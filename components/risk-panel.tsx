@@ -6,6 +6,7 @@ import { portfolioRisk } from "@/lib/risk/portfolio-risk";
 import { positionRisk } from "@/lib/risk/position-risk";
 import { IbkrBanner } from "./ibkr-banner";
 import { MetricHeader, MetricRow, fmtUsd as fmt, pct } from "./risk-metrics";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 
@@ -58,7 +59,7 @@ export function RiskPanel() {
             {/* Sectors */}
             <tbody>
               <tr>
-                <td colSpan={5} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
+                <td colSpan={8} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
               </tr>
               {risk.sectors.map((s) => {
                 const isOpen = openSectors.has(s.sector);
@@ -75,7 +76,7 @@ export function RiskPanel() {
                     </tr>
                     {isOpen && (
                       <tr className="bg-muted/30">
-                        <td colSpan={5} className="p-2 text-xs text-muted-foreground">
+                        <td colSpan={8} className="p-2 text-xs text-muted-foreground">
                           Entry → Stop: {fmt(s.totalEntryToStop)} · Current → Stop: {fmt(s.totalCurrentToStop)}
                         </td>
                       </tr>
@@ -88,7 +89,7 @@ export function RiskPanel() {
             {/* Positions */}
             <tbody>
               <tr>
-                <td colSpan={5} className="pt-3 pb-1 text-sm font-bold">Positions</td>
+                <td colSpan={8} className="pt-3 pb-1 text-sm font-bold">Positions</td>
               </tr>
               {snapshot.positions.map((p) => {
                 const pr = positionRisk(p, snapshot.orders);
@@ -105,12 +106,14 @@ export function RiskPanel() {
                           <>
                             {p.symbol}
                             {pr.unriskedQty > 0 && (
-                              <span
-                                className="ml-1 text-yellow-500"
-                                title={`${pr.unriskedQty} shares unprotected`}
-                              >
-                                ⚠
-                              </span>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger className="ml-1 text-yellow-500 cursor-help">⚠</TooltipTrigger>
+                                  <TooltipContent className="max-w-56">
+                                    {pr.unriskedQty} share{pr.unriskedQty !== 1 ? "s" : ""} have no stop order — these are fully exposed if the position moves against you.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
                             )}
                             <span className="text-xs text-muted-foreground ml-2">×{p.quantity}</span>
                           </>
@@ -120,7 +123,7 @@ export function RiskPanel() {
                     </tr>
                     {isOpen && (
                       <tr className="bg-muted/30">
-                        <td colSpan={5} className="p-2 text-xs">
+                        <td colSpan={8} className="p-2 text-xs">
                           {positionOrders.length === 0 ? (
                             <span className="text-muted-foreground">No pending orders</span>
                           ) : (
