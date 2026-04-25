@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
             const holdings = await fetchHoldings(sector);
             for (const h of holdings) symbolSet.add(h.ticker);
           } catch (e) {
+            console.error(`Holdings fetch failed for ${sector}:`, e);
             send("error", { sector, message: `Failed to fetch holdings: ${e}` });
           }
         }
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (e) {
             skipped++;
-            console.error(`Error screening ${symbol}:`, e);
+            console.warn(`Skipped ${symbol}: ${(e as Error).message ?? e}`);
           }
           send("progress", { scanned, total, matches, skipped });
         }

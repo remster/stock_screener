@@ -91,7 +91,10 @@ export function useScreen(cacheKey?: string) {
                 setFilterBreakdown(data.filterBreakdown);
                 setStatus("done");
               }
-              else if (currentEvent === "error") setStatus("error");
+              else if (currentEvent === "error") {
+                if (data.message?.startsWith("Screen failed")) setStatus("error");
+                else console.warn("Sector warning:", data.message ?? data);
+              }
             }
           }
           return read();

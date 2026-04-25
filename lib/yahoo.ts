@@ -19,7 +19,8 @@ ensureCacheDir(CACHE_DIR);
 async function fetchSSGAHoldings(ticker: string): Promise<ETFHolding[]> {
   const key = `holdings/${ticker.toLowerCase()}.json`;
   if (isCacheFresh(CACHE_DIR, key, TTL.HOLDINGS)) {
-    return cacheRead(CACHE_DIR, key) as ETFHolding[];
+    const cached = cacheRead(CACHE_DIR, key) as ETFHolding[] | null;
+    if (cached) return cached;
   }
 
   const url = `https://www.ssga.com/library-content/products/fund-data/etfs/us/holdings-daily-us-en-${ticker.toLowerCase()}.xlsx`;
@@ -48,24 +49,39 @@ async function fetchSSGAHoldings(ticker: string): Promise<ETFHolding[]> {
   return result;
 }
 
+const ISHARES_PRODUCTS: Record<string, { id: string; slug: string }> = {
+  IWM: { id: "239710", slug: "ishares-russell-2000-etf" },
+  ITA: { id: "239502", slug: "ishares-us-aerospace-defense-etf" },
+};
+
 async function fetchIsharesHoldings(ticker: string): Promise<ETFHolding[]> {
   const upper = ticker.toUpperCase();
   const key = `holdings/${upper}.json`;
   if (isCacheFresh(CACHE_DIR, key, TTL.HOLDINGS)) {
-    return cacheRead(CACHE_DIR, key) as ETFHolding[];
+    const cached = cacheRead(CACHE_DIR, key) as ETFHolding[] | null;
+    if (cached) return cached;
   }
 
-  const csvUrl = `https://www.ishares.com/us/products/239710/ishares-russell-2000-etf/1467271812596.ajax?fileType=csv&fileName=${upper}_holdings&dataType=fund`;
+  const product = ISHARES_PRODUCTS[upper];
+  if (!product) throw new Error(`No iShares product info configured for ticker: ${upper}`);
+
+  const csvUrl = `https://www.ishares.com/us/products/${product.id}/${product.slug}/1467271812596.ajax?fileType=csv&fileName=${upper}_holdings&dataType=fund`;
 
   const res = await fetch(csvUrl);
-  if (!res.ok) throw new Error(`Failed to fetch iShares holdings: ${res.statusText}`);
+  if (!res.ok) throw new Error(`Failed to fetch iShares holdings for ${upper}: ${res.statusText}`);
 
   const text = await res.text();
-  const csvData = text.split("\n \n")[1];
-  const records = csvParse(csvData, { columns: true, skip_empty_lines: true }) as Record<string, string>[];
+
+  // Skip fund metadata header — find the line starting with "Ticker"
+  const lines = text.split(/\r?\n/);
+  const headerIdx = lines.findIndex((line) => /^"?Ticker"?,/.test(line));
+  if (headerIdx === -1) throw new Error(`Could not find data header in iShares CSV for ${upper}`);
+
+  const csvData = lines.slice(headerIdx).join("\n");
+  const records = csvParse(csvData, { columns: true, skip_empty_lines: true, relax_column_count: true }) as Record<string, string>[];
 
   const result: ETFHolding[] = records
-    .filter((r) => r["Ticker"] && r["Name"])
+    .filter((r) => r["Ticker"] && r["Name"] && r["Ticker"] !== "-")
     .map((r) => ({
       ticker: r["Ticker"].trim(),
       name: r["Name"].trim(),
@@ -137,7 +153,7 @@ export async function fetchFundamentals(symbol: string): Promise<Record<string, 
     cacheWrite(CACHE_DIR, key, summary);
     return summary as unknown as Record<string, unknown>;
   } catch (e) {
-    console.error(`Failed to fetch fundamentals for ${symbol}:`, e);
+    console.warn(`Failed to fetch fundamentals for ${symbol}: ${(e as Error).message ?? e}`);
     return null;
   }
 }
@@ -158,7 +174,7 @@ export async function fetchSector(symbol: string): Promise<string> {
     cacheWrite(CACHE_DIR, key, { sector });
     return sector;
   } catch (e) {
-    console.error(`Failed to fetch sector for ${symbol}:`, e);
+    console.warn(`Failed to fetch sector for ${symbol}: ${(e as Error).message ?? e}`);
     return "Unknown";
   }
 }
