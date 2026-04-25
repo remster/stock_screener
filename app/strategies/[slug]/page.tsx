@@ -4,6 +4,7 @@ import { useEffect, use } from "react";
 import { useScreen } from "@/lib/hooks/use-screen";
 import { ProgressBar } from "@/components/progress-bar";
 import { StrategyResultsTable } from "@/components/strategy-results-table";
+import { SectorBreakoutResults } from "@/components/sector-breakout-results";
 import { getStrategy } from "@/lib/strategies/index";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
@@ -21,7 +22,7 @@ export default function StrategyResultsPage({
 }) {
   const { slug } = use(params);
   const strategy = getStrategy(slug);
-  const { results, progress, status, filterBreakdown, run } = useScreen();
+  const { results, progress, status, filterBreakdown, sectorStrengths, run } = useScreen();
 
   useEffect(() => {
     if (!strategy) return;
@@ -56,7 +57,10 @@ export default function StrategyResultsPage({
       </div>
       <p className="text-sm text-muted-foreground mb-4">{strategy.description}</p>
       <ProgressBar progress={progress} status={status} />
-      <StrategyResultsTable results={results} />
+      {slug === "sector-breakout"
+        ? <SectorBreakoutResults results={results} sectorStrengths={sectorStrengths} />
+        : <StrategyResultsTable results={results} />
+      }
     </div>
   );
 }

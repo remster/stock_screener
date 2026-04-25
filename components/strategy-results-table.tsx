@@ -18,6 +18,7 @@ export interface ScreenResult {
   rsi14: number | null;
   fundamentalsScore: number | null;
   filterResult: Record<string, boolean>;
+  sector?: string;
 }
 
 type SortDirection = "asc" | "desc";

@@ -9,6 +9,7 @@ export interface ScreenResult {
   rsi14: number | null;
   fundamentalsScore: number | null;
   filterResult: Record<string, boolean>;
+  sector?: string;
 }
 
 export interface ScreenProgress {
@@ -25,6 +26,7 @@ interface ScreenSnapshot {
   progress: ScreenProgress | null;
   status: ScreenStatus;
   filterBreakdown: Record<string, number> | null;
+  sectorStrengths: Record<string, number> | null;
 }
 
 const cache = new Map<string, ScreenSnapshot>();
@@ -36,6 +38,7 @@ export function useScreen(cacheKey?: string) {
   const [progress, setProgress] = useState<ScreenProgress | null>(cached?.progress ?? null);
   const [status, setStatus] = useState<ScreenStatus>(cached?.status ?? "idle");
   const [filterBreakdown, setFilterBreakdown] = useState<Record<string, number> | null>(cached?.filterBreakdown ?? null);
+  const [sectorStrengths, setSectorStrengths] = useState<Record<string, number> | null>(cached?.sectorStrengths ?? null);
   const abortRef = useRef<AbortController | null>(null);
   const cacheKeyRef = useRef(cacheKey);
   cacheKeyRef.current = cacheKey;
@@ -43,9 +46,9 @@ export function useScreen(cacheKey?: string) {
   // Persist to cache on completion
   useEffect(() => {
     if (cacheKeyRef.current && status === "done") {
-      cache.set(cacheKeyRef.current, { results, progress, status, filterBreakdown });
+      cache.set(cacheKeyRef.current, { results, progress, status, filterBreakdown, sectorStrengths });
     }
-  }, [status, results, progress, filterBreakdown]);
+  }, [status, results, progress, filterBreakdown, sectorStrengths]);
 
   const run = useCallback((slug: string, params: Record<string, number>, sectors?: string[]) => {
     abortRef.current?.abort();
@@ -56,6 +59,7 @@ export function useScreen(cacheKey?: string) {
     setProgress(null);
     setStatus("scanning");
     setFilterBreakdown(null);
+    setSectorStrengths(null);
 
     fetch("/api/screen", {
       method: "POST",
@@ -89,6 +93,7 @@ export function useScreen(cacheKey?: string) {
               else if (currentEvent === "done") {
                 setProgress(data);
                 setFilterBreakdown(data.filterBreakdown);
+                setSectorStrengths(data.sectorStrengths ?? null);
                 setStatus("done");
               }
               else if (currentEvent === "error") {
@@ -108,5 +113,5 @@ export function useScreen(cacheKey?: string) {
     });
   }, []);
 
-  return { results, progress, status, filterBreakdown, run };
+  return { results, progress, status, filterBreakdown, sectorStrengths, run };
 }

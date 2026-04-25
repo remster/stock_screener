@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { getStrategy } from "@/lib/strategies/index";
 import { fetchHoldings, fetchHistory, fetchFundamentals } from "@/lib/yahoo";
 import { insertSma } from "@/lib/indicators/sma";
+import { smaSlope } from "@/lib/indicators/slope";
 import { rsi } from "@/lib/indicators/rsi";
 import { supportResistance } from "@/lib/indicators/support-resistance";
 import { computeFundamentalsScore } from "@/lib/fundamentals/score";
@@ -34,10 +35,14 @@ export async function POST(request: NextRequest) {
 
       try {
         const symbolSet = new Set<string>();
+        const symbolToSector = new Map<string, string>();
         for (const sector of activeSectors) {
           try {
             const holdings = await fetchHoldings(sector);
-            for (const h of holdings) symbolSet.add(h.ticker);
+            for (const h of holdings) {
+              if (!symbolToSector.has(h.ticker)) symbolToSector.set(h.ticker, sector);
+              symbolSet.add(h.ticker);
+            }
           } catch (e) {
             console.error(`Holdings fetch failed for ${sector}:`, e);
             send("error", { sector, message: `Failed to fetch holdings: ${e}` });
@@ -111,6 +116,7 @@ export async function POST(request: NextRequest) {
               send("result", {
                 symbol: stock.symbol, name: stock.name, close: stock.last.close,
                 rsi14: stock.last.rsi14, fundamentalsScore: stock.fundamentalsScore, filterResult,
+                sector: symbolToSector.get(symbol),
               });
             }
           } catch (e) {
@@ -120,7 +126,21 @@ export async function POST(request: NextRequest) {
           send("progress", { scanned, total, matches, skipped });
         }
 
-        send("done", { scanned, total, matches, skipped, filterBreakdown });
+        // Compute SMA slope for each sector ETF to rank sector strength
+        const sectorStrengths: Record<string, number> = {};
+        await Promise.all(
+          activeSectors.map(async (etf) => {
+            try {
+              const candles = await fetchHistory(etf, 150);
+              insertSma(candles, 50);
+              sectorStrengths[etf] = smaSlope(candles, 50);
+            } catch {
+              sectorStrengths[etf] = 0;
+            }
+          })
+        );
+
+        send("done", { scanned, total, matches, skipped, filterBreakdown, sectorStrengths });
       } catch (e) {
         send("error", { message: `Screen failed: ${e}` });
       } finally {
