@@ -9,6 +9,8 @@ export interface MetricResult {
   rating: Rating;
   formatted: string;
   description: string;
+  wikiUrl: string;
+  justify: string;
   weight: number;
 }
 
@@ -35,15 +37,18 @@ export function computeFundamentalsScore(data: Record<string, unknown>): Fundame
     if (value === null) {
       metrics.push({
         key: def.key, label: def.label, category: def.category, value: null,
-        score: 5, rating: "grey", formatted: "N/A", description: def.description, weight: def.weight,
+        score: 5, rating: "grey", formatted: "N/A", description: def.description,
+        wikiUrl: def.wikiUrl, justify: "No data available for this metric.", weight: def.weight,
       });
       continue;
     }
     const score = def.score(value);
     const rating = getRating(score);
+    const formatted = def.format(value);
     metrics.push({
       key: def.key, label: def.label, category: def.category, value, score, rating,
-      formatted: def.format(value), description: def.description, weight: def.weight,
+      formatted, description: def.description, wikiUrl: def.wikiUrl,
+      justify: def.justify(value, formatted), weight: def.weight,
     });
     weightedSum += score * def.weight;
     totalWeight += def.weight;

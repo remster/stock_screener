@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const CATEGORIES = ["Valuation", "Profitability", "Growth", "Financial Health", "Dividend"] as const;
 
@@ -44,7 +45,26 @@ function MetricRow({ metric }: { metric: MetricResult }) {
   return (
     <div className="flex items-center gap-2 py-1">
       <span className={`inline-block size-2.5 rounded-full shrink-0 ${ratingColor(metric.rating)}`} />
-      <span className="text-sm flex-1 truncate">{metric.label}</span>
+      <TooltipProvider closeDelay={300}>
+        <Tooltip>
+          <TooltipTrigger className="text-sm flex-1 truncate text-left cursor-help underline decoration-dotted underline-offset-2">
+            {metric.label}
+          </TooltipTrigger>
+          <TooltipContent side="right" className="max-w-72 space-y-2 p-3">
+            <a
+              href={metric.wikiUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-blue-400 hover:text-blue-300 underline underline-offset-2"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {metric.label} ↗
+            </a>
+            <p className="leading-snug text-neutral-300">{metric.description}</p>
+            <p className="text-yellow-300">{metric.justify}</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <Dialog>
         <DialogTrigger
           render={<Button variant="ghost" size="icon-xs" className="text-muted-foreground" aria-label={`Info for ${metric.label}`} />}
