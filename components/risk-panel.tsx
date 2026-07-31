@@ -1,0 +1,151 @@
+"use client";
+
+import { Fragment, useMemo, useState } from "react";
+import { useIbkr } from "@/lib/hooks/use-ibkr";
+import { portfolioRisk } from "@/lib/risk/portfolio-risk";
+import { positionRisk } from "@/lib/risk/position-risk";
+import { IbkrBanner } from "./ibkr-banner";
+import { MetricHeader, MetricRow, fmtUsd as fmt, pct } from "./risk-metrics";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import Link from "next/link";
+
+export function RiskPanel() {
+  const { snapshot, loading, refresh } = useIbkr();
+  const [openSectors, setOpenSectors] = useState<Set<string>>(new Set());
+  const [openPositions, setOpenPositions] = useState<Set<string>>(new Set());
+
+  const risk = useMemo(
+    () => portfolioRisk(snapshot.positions, snapshot.orders, snapshot.netLiquidation ?? 0),
+    [snapshot],
+  );
+
+  const toggle = (set: Set<string>, key: string, setter: (s: Set<string>) => void) => {
+    const next = new Set(set);
+    next.has(key) ? next.delete(key) : next.add(key);
+    setter(next);
+  };
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Portfolio Risk</CardTitle>
+        <Link href="/risk/simulate" className="text-sm underline">Simulate Trade</Link>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <IbkrBanner snapshot={snapshot} loading={loading} onRefresh={refresh} />
+
+        {snapshot.connected && (
+          <>
+            <div className="text-sm">
+              Net Liquidation Value: <span className="font-bold tabular-nums">{fmt(risk.netLiquidation)}</span>{" "}
+              <span className="text-muted-foreground">(risked <span className="font-bold">{pct(risk.totalRiskPercent)}</span>)</span>
+            </div>
+            <table className="w-full text-sm">
+            <thead>
+              <MetricHeader />
+            </thead>
+
+            {/* Portfolio */}
+            <tbody>
+              <tr className="font-semibold border-b">
+                <MetricRow
+                  label="Portfolio"
+                  m={{ cost: risk.totalCostBasis, stop: risk.totalStopValue, now: risk.totalCurrentValue }}
+                />
+              </tr>
+            </tbody>
+
+            {/* Sectors */}
+            <tbody>
+              <tr>
+                <td colSpan={8} className="pt-3 pb-1 text-sm font-bold">Sectors</td>
+              </tr>
+              {risk.sectors.map((s) => {
+                const isOpen = openSectors.has(s.sector);
+                return (
+                  <Fragment key={s.sector}>
+                    <tr
+                      className="border-t cursor-pointer"
+                      onClick={() => toggle(openSectors, s.sector, setOpenSectors)}
+                    >
+                      <MetricRow
+                        label={`${s.sector} (${s.positionCount})`}
+                        m={{ cost: s.costBasis, stop: s.stopValue, now: s.currentValue }}
+                      />
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-muted/30">
+                        <td colSpan={8} className="p-2 text-xs text-muted-foreground">
+                          Entry → Stop: {fmt(s.totalEntryToStop)} · Current → Stop: {fmt(s.totalCurrentToStop)}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+
+            {/* Positions */}
+            <tbody>
+              <tr>
+                <td colSpan={8} className="pt-3 pb-1 text-sm font-bold">Positions</td>
+              </tr>
+              {snapshot.positions.map((p) => {
+                const pr = positionRisk(p, snapshot.orders);
+                const positionOrders = snapshot.orders.filter((o) => o.symbol === p.symbol);
+                const isOpen = openPositions.has(p.symbol);
+                return (
+                  <Fragment key={p.symbol}>
+                    <tr
+                      className="border-t cursor-pointer"
+                      onClick={() => toggle(openPositions, p.symbol, setOpenPositions)}
+                    >
+                      <MetricRow
+                        label={
+                          <>
+                            {p.symbol}
+                            {pr.unriskedQty > 0 && (
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger className="ml-1 text-yellow-500 cursor-help">⚠</TooltipTrigger>
+                                  <TooltipContent className="max-w-56">
+                                    {pr.unriskedQty} share{pr.unriskedQty !== 1 ? "s" : ""} have no stop order — these are fully exposed if the position moves against you.
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            )}
+                            <span className="text-xs text-muted-foreground ml-2">×{p.quantity}</span>
+                          </>
+                        }
+                        m={{ cost: pr.costBasis, stop: pr.stopValue, now: pr.currentValue }}
+                      />
+                    </tr>
+                    {isOpen && (
+                      <tr className="bg-muted/30">
+                        <td colSpan={8} className="p-2 text-xs">
+                          {positionOrders.length === 0 ? (
+                            <span className="text-muted-foreground">No pending orders</span>
+                          ) : (
+                            <ul className="space-y-1">
+                              {positionOrders.map((o, i) => (
+                                <li key={i}>
+                                  {o.side} {o.orderType} {o.quantity} @ {o.price} ({o.status})
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
